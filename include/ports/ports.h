@@ -16,6 +16,6 @@ typedef struct {
     char log_file[128];
 } PortGuardConfig;
 
-void read_config_file_example(void);
+void read_config_file_example();
 
 #endif // PORTS_H

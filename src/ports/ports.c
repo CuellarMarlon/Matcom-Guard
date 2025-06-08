@@ -36,7 +36,7 @@ static int parse_strings(const char *value, char arr[][32], int max_items) {
     return count;
 }
 
-void read_config_file_example(void) {
+void read_config_file_example() {
     FILE *file = fopen(CONFIG_FILE_PATH, "r");
     if (!file) {
         perror("No se pudo abrir el archivo de configuración");

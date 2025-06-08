@@ -21,6 +21,8 @@
    - Implementar funciones para leer y parsear `/proc/net/tcp`, `/proc/net/udp`, `/proc/net/tcp6`, `/proc/net/udp6`.
    - Extraer información relevante: IP local, puerto local, estado de la conexión, PID.
 
+   ***Objetivo:*** Implementar la lógica para leer y analizar los puertos abiertos y conexiones activas en el sistema, usando los archivos tcp, udp, tcp6 y udp6.
+
 4. **Identificar puertos abiertos y conexiones activas**
    - Listar todos los puertos en estado LISTEN y conexiones establecidas.
    - Asociar cada puerto/proceso con su PID y nombre de proceso (usando `/proc/[pid]/cmdline`).
