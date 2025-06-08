@@ -15,6 +15,8 @@
 2. **Leer y parsear el archivo de configuración**
    - Implementar funciones para cargar puertos permitidos y excepciones desde el archivo.
 
+   ***Objetivo:*** Implementar la lógica para que tu programa lea y entienda el archivo matcomguard.conf. Así, todos los parámetros definidos por el usuario (puertos permitidos, IPs de confianza, umbrales, etc.) podrán ser usados dinámicamente por el sistema, sin necesidad de recompilar.
+
 3. **Leer el estado actual de los puertos**
    - Implementar funciones para leer y parsear `/proc/net/tcp`, `/proc/net/udp`, `/proc/net/tcp6`, `/proc/net/udp6`.
    - Extraer información relevante: IP local, puerto local, estado de la conexión, PID.
