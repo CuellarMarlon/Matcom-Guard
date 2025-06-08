@@ -27,6 +27,8 @@
    - Listar todos los puertos en estado LISTEN y conexiones establecidas.
    - Asociar cada puerto/proceso con su PID y nombre de proceso (usando `/proc/[pid]/cmdline`).
 
+   ***Objetivo:*** Construir la lógica que cruza la información de red real con las reglas de seguridad definidas por el usuario, para detectar y reportar cualquier incumplimiento.
+
 5. **Comparar con la configuración**
    - Verificar si los puertos abiertos están permitidos.
    - Verificar si las conexiones activas son a/desde IPs permitidas.

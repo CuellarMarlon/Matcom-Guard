@@ -22,7 +22,7 @@ void hex_to_ip6(const char *hex, char *ip_str) {
     inet_ntop(AF_INET6, ip_bytes, ip_str, 40);
 }
 
-// Parsear una línea de TCP/UDP IPv4
+// Parsear una linea de TCP/UDP IPv4
 int parse_tcp_line4(const char *line, FileEntry4 *entry) {
     char local_ip_hex[9], rem_ip_hex[9];
     unsigned int local_port_hex, rem_port_hex;
@@ -48,7 +48,7 @@ int parse_tcp_line4(const char *line, FileEntry4 *entry) {
     return 1;
 }
 
-// Parsear una línea de TCP/UDP IPv6
+// Parsear una linea de TCP/UDP IPv6
 int parse_tcp_line6(const char *line, FileEntry6 *entry) {
     char local_ip_hex[33], rem_ip_hex[33];
     unsigned int local_port_hex, rem_port_hex;

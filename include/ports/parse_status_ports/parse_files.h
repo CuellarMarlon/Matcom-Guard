@@ -23,7 +23,7 @@ typedef struct {
     unsigned long inode;
 } FileEntry6;
 
-// Funciones para parsear cada archivo
+// Parsear cada archivo
 void parse_file4(int flag, FileEntry4 *entries, int *count); // 0:tcp, 1:udp
 void parse_file6(int flag, FileEntry6 *entries, int *count); // 0:tcp6, 1:udp6
 
