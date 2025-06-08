@@ -3,7 +3,7 @@ CFLAGS=-Iinclude -Iinclude/ports -Wall -Wextra -g
 
 SRC=src/main.c \
     src/ports/ports.c \
-    src/ports/read_status_ports/read_tcp.c
+    src/ports/parse_status_ports/parse_files.c
 
 OUT=matcomguard
 
