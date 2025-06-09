@@ -1,5 +1,3 @@
-// active_scanner.c
-
 #include "ports/scan_ports/active_scanner.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,7 +17,6 @@ typedef struct {
     const char *service;
 } PortService;
 
-// Lista de servicios comunes (puertos que se usan normalmente en aplicaciones legítimas)
 static PortService common_services[] = {
     {21, "FTP"},    {22, "SSH"},    {23, "Telnet"}, {25, "SMTP"},    {53, "DNS"},
     {67, "DHCP"},   {68, "DHCP"},   {80, "HTTP"},   {110, "POP3"},   {111, "RPCbind"},
@@ -42,10 +39,8 @@ static const char *get_service_name(int port) {
     return NULL;
 }
 
-// Lista de puertos altos que se consideran legítimos pese a estar por encima de 1024
 static int justified_high_ports[] = {8080, 8443, 8888};
 
-// Función para comprobar si un puerto está justificado como alto
 static int is_justified_high_port(int port) {
     size_t len = sizeof(justified_high_ports) / sizeof(justified_high_ports[0]);
     for (size_t i = 0; i < len; ++i) {
@@ -55,7 +50,6 @@ static int is_justified_high_port(int port) {
     return 0;
 }
 
-// Lista de puertos sospechosos, que generan alerta aunque tengan un servicio asignado
 static int suspicious_ports[] = {31337, 4444, 6667};
 
 static int is_suspicious_port(int port) {
@@ -68,9 +62,22 @@ static int is_suspicious_port(int port) {
 }
 
 // =======================================================
+// Almacenamiento del estado previo para evitar spam en la consola
+// =======================================================
+#define START_PORT 0
+#define END_PORT 65535
+#define NUM_PORTS (END_PORT - START_PORT + 1)
+static int previous_states[NUM_PORTS];
+
+void init_previous_states() {
+    for (int i = 0; i < NUM_PORTS; i++) {
+        previous_states[i] = -1;  // -1 indica que aún no hay un estado previo (primera iteración)
+    }
+}
+
+// =======================================================
 // Función de escaneo de puertos
 // =======================================================
-
 /*
  * Escanea puertos TCP en el rango [start_port, end_port] en localhost.
  * La lógica es la siguiente:
@@ -80,6 +87,9 @@ static int is_suspicious_port(int port) {
  *         y no está en la lista de justificación, se genera "Alerta".
  *       * De lo contrario, se genera "Reporte:" indicando que está permitido.
  *   - Si no se logra conectar, se reporta que el puerto está cerrado.
+ *
+ * Ahora se compara el estado actual del puerto (abierto/cerrado) con el estado
+ * del ciclo anterior y se imprime el mensaje únicamente si hubo un cambio.
  */
 void scan_ports_tcp(int start_port, int end_port) {
     struct sockaddr_in addr;
@@ -99,32 +109,34 @@ void scan_ports_tcp(int start_port, int end_port) {
 
         addr.sin_port = htons(port);
         int result = connect(sock, (struct sockaddr *)&addr, sizeof(addr));
-
-        if (result == 0) {
-            // Puerto responde
-            const char *service = get_service_name(port);
-            
-            // Si el puerto es uno de los sospechosos se reporta en alerta.
-            if (is_suspicious_port(port)) {
-                if (port == 4444)
-                    printf("Alerta: \"Servidor HTTP en puerto no estándar %d/tcp\"\n", port);
-                else
-                    printf("Alerta: \"Puerto %d/tcp abierto (no permitido)\"\n", port);
-            } else {
-                // Si el puerto no tiene servicio esperado y es alto sin justificación: alerta.
-                if (service == NULL && port > 1024 && !is_justified_high_port(port)) {
-                    printf("Alerta: \"Puerto %d/tcp abierto (no permitido, servicio desconocido)\"\n", port);
-                } else {
-                    // En caso contrario, se reporta como permitido.
-                    if (service != NULL)
-                        printf("Reporte: \"Puerto %d/tcp (%s) abierto (permitido)\"\n", port, service);
-                    else
-                        printf("Reporte: \"Puerto %d/tcp abierto (permitido)\"\n", port);
-                }
-            }
-        } else {
-            printf("Reporte: \"Puerto %d/tcp cerrado\"\n", port);
-        }
         close(sock);
+
+        int new_status = (result == 0) ? 1 : 0;
+        int index = port - start_port;
+
+        // Solo imprimir si el estado cambió respecto al ciclo anterior
+        if (previous_states[index] != new_status) {
+            if (result == 0) { // Si se conecta, significa que el puerto está abierto
+                const char *service = get_service_name(port);
+                if (is_suspicious_port(port)) {
+                    if (port == 4444)
+                        printf("Alerta: \"Servidor HTTP en puerto no estándar %d/tcp\"\n", port);
+                    else
+                        printf("Alerta: \"Puerto %d/tcp abierto (no permitido)\"\n", port);
+                } else {
+                    if (service == NULL && port > 1024 && !is_justified_high_port(port))
+                        printf("Alerta: \"Puerto %d/tcp abierto (no permitido, servicio desconocido)\"\n", port);
+                    else {
+                        if (service != NULL)
+                            printf("Reporte: \"Puerto %d/tcp (%s) abierto (permitido)\"\n", port, service);
+                        else
+                            printf("Reporte: \"Puerto %d/tcp abierto (permitido)\"\n", port);
+                    }
+                }
+            } else {
+                printf("Reporte: \"Puerto %d/tcp cerrado\"\n", port);
+            }
+            previous_states[index] = new_status;  // Actualizar el estado para la próxima comparación
+        }
     }
 }

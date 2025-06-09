@@ -1,0 +1,33 @@
+# Binary output directory
+/bin/
+
+# Compiled object files and executables
+*.o
+*.obj
+*.exe
+*.out
+*.a
+*.so
+*.dll
+*.dylib
+matcomguard
+
+# Build directories (pueden generarse con Makefile u otras herramientas)
+build/
+out/
+
+# Archivos temporales, backups y de editores
+*~
+*.swp
+*.swo
+*.tmp
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Ignorar archivos de log y temporales
+*.log
+
+# Archivos de configuración de IDEs y editores
+.vscode/
