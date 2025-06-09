@@ -3,36 +3,22 @@
 1. **Diseñar el archivo de configuración**
    - Definir el formato (ejemplo: lista de puertos permitidos, IPs de confianza, umbrales).
    - Crear un archivo de ejemplo `/etc/matcomguard.conf`.
-   
-   ***Objetivo:*** El objetivo es crear un archivo de configuración centralizado que permita definir, de forma flexible y editable, los parámetros de seguridad de tu sistema. Este archivo servirá para que el usuario (o administrador) pueda especificar:
-      1. Qué puertos están permitidos (puertos abiertos autorizados).
-      2. Qué IPs son de confianza (permitidas para conexiones).
-      3. Umbrales de alerta (por ejemplo, cuántos puertos abiertos son sospechosos).
-      4. Otras excepciones o parámetros relevantes.
-   
-   Esto hace que tu sistema sea configurable sin recompilar el código y adaptable a diferentes entornos o necesidades.
 
 2. **Leer y parsear el archivo de configuración**
    - Implementar funciones para cargar puertos permitidos y excepciones desde el archivo.
-
-   ***Objetivo:*** Implementar la lógica para que tu programa lea y entienda el archivo matcomguard.conf. Así, todos los parámetros definidos por el usuario (puertos permitidos, IPs de confianza, umbrales, etc.) podrán ser usados dinámicamente por el sistema, sin necesidad de recompilar.
 
 3. **Leer el estado actual de los puertos**
    - Implementar funciones para leer y parsear `/proc/net/tcp`, `/proc/net/udp`, `/proc/net/tcp6`, `/proc/net/udp6`.
    - Extraer información relevante: IP local, puerto local, estado de la conexión, PID.
 
-   ***Objetivo:*** Implementar la lógica para leer y analizar los puertos abiertos y conexiones activas en el sistema, usando los archivos tcp, udp, tcp6 y udp6.
-
 4. **Identificar puertos abiertos y conexiones activas**
    - Listar todos los puertos en estado LISTEN y conexiones establecidas.
    - Asociar cada puerto/proceso con su PID y nombre de proceso (usando `/proc/[pid]/cmdline`).
 
-   ***Objetivo:*** Construir la lógica que cruza la información de red real con las reglas de seguridad definidas por el usuario, para detectar y reportar cualquier incumplimiento.
-
 5. **Comparar con la configuración**
    - Verificar si los puertos abiertos están permitidos.
    - Verificar si las conexiones activas son a/desde IPs permitidas.
-
+   
 6. **Detectar anomalías**
    - Marcar puertos abiertos no autorizados.
    - Marcar conexiones a IPs o puertos no permitidos.
@@ -55,3 +41,10 @@
 
 11. **Documentar el código y el uso**
     - Escribir comentarios y documentación para facilitar el mantenimiento y la configuración.
+
+12. **Lo que tengo hecho**
+    - Parseo de archivos tcp, udp, tcp6, udp6. Esto permite obtener todas las conexiones y puertos abiertos en el sistema, tanto IPv4 como IPv6, TCP y UDP. Esto esta implementado mediante funciones que leen cada archivo (parse_tcp_line4() y parse_tcp_line6()) y estas funciones llenar arrays de estructuras (FileEntry4 y  FileEntry6) con la informacion relevante (IP, puerto, estado, UID, inode).
+    - Carga de configuracion en el archivo matcomguard.conf. Define las reglas de seguridad: puertos permitidos, IPs confiables, procesos permitidos, umbrales, etc. Esto esta implementado con una funcion que lee la configuracion y  la guarda en una estructura PortGuardConfig.
+    - Analisis de puertos y conexiones. Esto es para detectar violaciones de seguridad (puertos no permitidos, conexiones sospechosas). En la implementacion tengo la funcion analyze_ports() que compara cada puerto/conexion con la configuracion y genera alertas si encuentra algo no permitido.
+    - Asociacion de puertos a procesos. Permite saber que procesos estan usando cada puerto/conexion es fundamental para la seguridad y para tomar acciones. En la implementacion esta la funcion find_process_by_inode() que busca el PID y el nombre del proceso a partid del inode del socket, recorriendo /proc/[pid]/fd/.
+    
