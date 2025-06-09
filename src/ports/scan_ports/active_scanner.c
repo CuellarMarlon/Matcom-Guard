@@ -56,12 +56,17 @@ void scan_ports_tcp(int start_port, int end_port) {
         if (result == 0) {
             const char *service = get_service_name(port);
             if (service) {
-                printf("Puerto %d ABIERTO (%s)\n", port, service);
-            } else if (port > 1024 && !is_justified_high_port(port)) {
-                printf("Puerto %d ABIERTO (potencialmente comprometido, alto y desconocido)\n", port);
+                // Es un puerto estándar conocido
+                printf("Puerto %d/tcp (%s) abierto ✔\n", port, service);
+            } else if ((port > 1024 && !is_justified_high_port(port)) || port == 31337 || port == 4444 || port == 6667) {
+                // Es un puerto alto no justificado o uno conocido por ser sospechoso
+                printf("Puerto %d/tcp abierto (no estándar) !\n", port);
             } else {
-                printf("Puerto %d ABIERTO (servicio desconocido)\n", port);
+                // Abierto pero no está en la lista de servicios ni es alto sospechoso
+                printf("Puerto %d/tcp abierto (servicio desconocido)\n", port);
             }
+        } else {
+            printf("Puerto %d/tcp cerrado\n", port);
         }
         close(sock);
     }
