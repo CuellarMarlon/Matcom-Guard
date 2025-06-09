@@ -5,7 +5,8 @@ SRC=src/main.c \
     src/ports/ports.c \
     src/ports/parse_status_ports/parse_files.c \
     src/ports/analysis_ports/port_analyzer.c \
-    src/ports/analysis_ports/process_lookup.c
+    src/ports/analysis_ports/process_lookup.c \
+    src/ports/scan_ports/active_scanner.c
 
 OUT=matcomguard
 
