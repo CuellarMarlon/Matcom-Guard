@@ -2,6 +2,7 @@
 #include "ports/parse_status_ports/parse_files.h"
 #include "ports/analysis_ports/port_analyzer.h"
 #include "ports/ports.h"
+#include "ports/scan_ports/active_scanner.h"
 
 int main(void) {
     FileEntry4 tcp_entries[256], udp_entries[256];
@@ -26,6 +27,9 @@ int main(void) {
         udp6_entries, udp6_count,
         &config
     );
+
+    // Escaneo activo de puertos TCP del 1 al 1024
+    scan_ports_tcp(1, 1024);
 
     return 0;
 }
