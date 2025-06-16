@@ -1,4 +1,4 @@
-#include "ports/scan_ports/active_scanner.h"
+#include "ports.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
