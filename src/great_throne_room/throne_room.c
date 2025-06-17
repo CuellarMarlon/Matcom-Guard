@@ -5,6 +5,8 @@
 #include <sys/wait.h>
 #include "usb.h"
 #include "great_throne_room/throne_room.h"
+#include "processes.h"
+#include "ports.h"
 
 static volatile int running = 1;
 
@@ -34,6 +36,21 @@ void controlador_rf1_usb() {
     usb_monitor_destroy(mon);
 }
 
+void controlador_rf2_processes() {
+    main_controller(NULL, NULL);
+}
+
+int controlador_rf3_ports() {
+    init_previous_states();
+
+    int start_port = 1;
+    int end_port = 1024;
+
+    scan_ports_tcp(start_port, end_port);
+
+    return 0;
+}
+
 void controller() {
     pid_t pid_usb = fork();
     if (pid_usb == 0) {
@@ -41,17 +58,28 @@ void controller() {
         exit(EXIT_SUCCESS);
     }
 
-    // Cuando tengas más módulos, repites este patrón
-    // pid_t pid_proc = fork();
-    // if (pid_proc == 0) {
-    //     controlador_procesos(); // Por ejemplo
-    //     exit(EXIT_SUCCESS);
-    // }
+    pid_t pid_proc1 = fork();
+    if (pid_proc1 == 0) {
+        controlador_rf2_processes(); // Otro hijo
+        exit(EXIT_SUCCESS);
+    }
 
-    // El proceso padre puede esperar (o no) según el diseño
+    pid_t pid_proc2 = fork();
+    if (pid_proc2 == 0) {
+        controlador_rf3_ports(); // Otro hijo
+        exit(EXIT_SUCCESS);
+    }
+
+    // Esperar a los 3 hijos
     int status;
-    waitpid(pid_usb, &status, 0);
+    pid_t wpid;
+    int count = 0;
+    while ((wpid = wait(&status)) > 0 && count < 3) {
+        if (WIFEXITED(status)) {
+            printf("Proceso hijo %d terminó con código %d\n", wpid, WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            printf("Proceso hijo %d fue terminado por señal %d\n", wpid, WTERMSIG(status));
+        }
+        count++;
+    }
 }
-
-
-

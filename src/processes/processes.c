@@ -9,6 +9,7 @@
 #include <pthread.h>
 #include <sys/types.h>
 #include <time.h>
+#include <processes.h>
 
 #define MAX_PROC 32768
 #define MAX_WHITELIST 32
@@ -19,16 +20,6 @@ int UMBRAL_RAM = 50;      // %
 int UMBRAL_TIEMPO = 10;   // segundos
 const char* WHITELIST[MAX_WHITELIST] = { "gnome-shell", "bash", "gcc" };
 int WHITELIST_LEN = 3;
-
-// Estructura para procesos sospechosos
-typedef struct {
-    pid_t pid;
-    char nombre[256];
-    float uso_cpu;
-    float uso_ram;
-    int tiempo_sospechoso;
-    int activo;
-} ProcesoInfo;
 
 ProcesoInfo procesos_sospechosos[MAX_PROC];
 pthread_mutex_t mutex_procs = PTHREAD_MUTEX_INITIALIZER;
@@ -292,3 +283,38 @@ void crear_columnas(GtkWidget* treeview) {
     gtk_tree_view_insert_column_with_attributes(GTK_TREE_VIEW(treeview),
         -1, "Tiempo sospechoso (s)", renderer, "text", 4, NULL);
 }
+
+int main_controller(int argc, char* argv[]) {
+    gtk_init(&argc, &argv);
+
+    // Ventana principal
+    GtkWidget* window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(window), "Alertas MatCom Guard");
+    gtk_window_set_default_size(GTK_WINDOW(window), 600, 400);
+    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+    // Modelo para lista (5 columnas)
+    list_store = gtk_list_store_new(5,
+        G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+
+    // Crear vista de árbol y asignar modelo
+    treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(list_store));
+    crear_columnas(treeview);
+
+    GtkWidget* scrolled_window = gtk_scrolled_window_new(NULL, NULL);
+    gtk_container_add(GTK_CONTAINER(scrolled_window), treeview);
+    gtk_container_add(GTK_CONTAINER(window), scrolled_window);
+
+    // Arrancar hilo de monitoreo
+    pthread_t tid;
+    pthread_create(&tid, NULL, hilo_monitoreo, NULL);
+
+    // Timer para actualizar interfaz cada segundo
+    g_timeout_add_seconds(1, actualizar_lista_gui, NULL);
+
+    gtk_widget_show_all(window);
+    gtk_main();
+
+    return 0;
+}
+//-----------------------------------------------------------
