@@ -43,10 +43,10 @@ void controlador_rf2_processes() {
 int controlador_rf3_ports() {
     init_previous_states();
 
-    int start_port = 1;
-    int end_port = 1024;
-
-    scan_ports_tcp(start_port, end_port);
+    while (1) {
+        scan_ports_tcp(1, 65535);
+        sleep(10);
+    }
 
     return 0;
 }
