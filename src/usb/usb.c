@@ -100,8 +100,8 @@ static int process_file(const char *fpath, const struct stat *sb, int typeflag, 
     node->next = current_scan;
     current_scan = node;
 
-    printf("Hash de %s: ", fpath);
-    print_hash(hash);
+    // printf("Hash de %s: ", fpath);
+    // print_hash(hash);
     return 0;
 }
 

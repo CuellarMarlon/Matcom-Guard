@@ -20,14 +20,12 @@ typedef struct {
 static PortService common_services[] = {
     {21, "FTP"},    {22, "SSH"},    {23, "Telnet"}, {25, "SMTP"},    {53, "DNS"},
     {67, "DHCP"},   {68, "DHCP"},   {80, "HTTP"},   {110, "POP3"},   {111, "RPCbind"},
-    {123, "NTP"},   {135, "MS RPC"}, {139, "NetBIOS"},{143, "IMAP"},   {161, "SNMP"},
-    {179, "BGP"},   {389, "LDAP"},   {443, "HTTPS"}, {445, "SMB"},    {465, "SMTPS"},
-    {514, "Syslog"},{515, "LPD"},    {587, "Submission"},
-    {631, "IPP/CUPS"},{993, "IMAPS"},{995, "POP3S"}, {1433, "MSSQL"}, {1521, "Oracle"},
-    {2049, "NFS"},  {3306, "MySQL"}, {3389, "RDP"},  {5432, "PostgreSQL"},{5900, "VNC"},
-    {8080, "HTTP-alt"},{8443, "HTTPS-alt"},{8888, "Alternate HTTP"},
-    {6667, "IRC"},  {31337, "Back Orifice/Elite"},{4444, "Metasploit/Backdoor"}
-    // Puedes agregar más según necesidades.
+    {123, "NTP"},   {135, "MS RPC"},{139, "NetBIOS"},{143, "IMAP"},  {161, "SNMP"},
+    {179, "BGP"},   {389, "LDAP"},  {443, "HTTPS"}, {445, "SMB"},    {465, "SMTPS"},
+    {514, "Syslog"},{515, "LPD"},   {587, "Submission"},{631, "IPP/CUPS"},{993, "IMAPS"},
+    {995, "POP3S"}, {1433, "MSSQL"},{1521, "Oracle"},{2049, "NFS"},  {3306, "MySQL"},
+    {3389, "RDP"},  {5432, "PostgreSQL"},{5900, "VNC"},{8080, "HTTP-alt"},{8443, "HTTPS-alt"},
+    {8888, "Alternate HTTP"}, {6667, "IRC"}, {31337, "Back Orifice/Elite"}, {4444, "Metasploit/Backdoor"}
 };
 
 static const char *get_service_name(int port) {
@@ -62,7 +60,7 @@ static int is_suspicious_port(int port) {
 }
 
 // =======================================================
-// Almacenamiento del estado previo para evitar spam en la consola
+// Almacenamiento del estado previo
 // =======================================================
 #define START_PORT 0
 #define END_PORT 65535
@@ -71,26 +69,13 @@ static int previous_states[NUM_PORTS];
 
 void init_previous_states() {
     for (int i = 0; i < NUM_PORTS; i++) {
-        previous_states[i] = -1;  // -1 indica que aún no hay un estado previo (primera iteración)
+        previous_states[i] = -1;
     }
 }
 
 // =======================================================
-// Función de escaneo de puertos
+// Escaneo TCP con impresión por rangos
 // =======================================================
-/*
- * Escanea puertos TCP en el rango [start_port, end_port] en localhost.
- * La lógica es la siguiente:
- *   - Si se logra conectar (puerto abierto):
- *       * Se chequea si está en la lista de puertos sospechosos: se genera "Alerta".
- *       * Si no se encuentra en la lista de servicios comunes y el puerto es alto (>1024)
- *         y no está en la lista de justificación, se genera "Alerta".
- *       * De lo contrario, se genera "Reporte:" indicando que está permitido.
- *   - Si no se logra conectar, se reporta que el puerto está cerrado.
- *
- * Ahora se compara el estado actual del puerto (abierto/cerrado) con el estado
- * del ciclo anterior y se imprime el mensaje únicamente si hubo un cambio.
- */
 void scan_ports_tcp(int start_port, int end_port) {
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -98,12 +83,14 @@ void scan_ports_tcp(int start_port, int end_port) {
 
     printf("Escaneando puertos TCP del %d al %d en localhost...\n", start_port, end_port);
 
+    int start_closed = -1;
+    int in_closed_block = 0;
+
     for (int port = start_port; port <= end_port; ++port) {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
         if (sock < 0)
             continue;
 
-        // Configurar un timeout corto de 1 segundo
         struct timeval timeout = {1, 0};
         setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
@@ -114,9 +101,23 @@ void scan_ports_tcp(int start_port, int end_port) {
         int new_status = (result == 0) ? 1 : 0;
         int index = port - start_port;
 
-        // Solo imprimir si el estado cambió respecto al ciclo anterior
-        if (previous_states[index] != new_status) {
-            if (result == 0) { // Si se conecta, significa que el puerto está abierto
+        if (new_status == 0) {
+            // puerto cerrado
+            if (!in_closed_block) {
+                start_closed = port;
+                in_closed_block = 1;
+            }
+        } else {
+            // si se estaba acumulando cerrados, imprimir bloque
+            if (in_closed_block) {
+                if (start_closed == port - 1)
+                    printf("Reporte: \"Puerto %d/tcp cerrado\"\n", start_closed);
+                else
+                    printf("Reporte: \"Puertos %d–%d/tcp cerrados\"\n", start_closed, port - 1);
+                in_closed_block = 0;
+            }
+
+            if (previous_states[index] != 1) {
                 const char *service = get_service_name(port);
                 if (is_suspicious_port(port)) {
                     if (port == 4444)
@@ -133,10 +134,19 @@ void scan_ports_tcp(int start_port, int end_port) {
                             printf("Reporte: \"Puerto %d/tcp abierto (permitido)\"\n", port);
                     }
                 }
-            } else {
-                printf("Reporte: \"Puerto %d/tcp cerrado\"\n", port);
+                previous_states[index] = 1;
             }
-            previous_states[index] = new_status;  // Actualizar el estado para la próxima comparación
         }
+
+        if (new_status != previous_states[index])
+            previous_states[index] = new_status;
+    }
+
+    // Imprimir bloque final si quedaron puertos cerrados al final
+    if (in_closed_block) {
+        if (start_closed == end_port)
+            printf("Reporte: \"Puerto %d/tcp cerrado\"\n", start_closed);
+        else
+            printf("Reporte: \"Puertos %d–%d/tcp cerrados\"\n", start_closed, end_port);
     }
 }

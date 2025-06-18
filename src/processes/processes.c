@@ -15,9 +15,9 @@
 #define MAX_WHITELIST 32
 
 // Umbrales configurables
-int UMBRAL_CPU = 80;      // %
+int UMBRAL_CPU = 70;      // %
 int UMBRAL_RAM = 50;      // %
-int UMBRAL_TIEMPO = 10;   // segundos
+int UMBRAL_TIEMPO = 2;   // segundos
 const char* WHITELIST[MAX_WHITELIST] = { "gnome-shell", "bash", "gcc" };
 int WHITELIST_LEN = 3;
 
@@ -222,6 +222,7 @@ gboolean actualizar_lista_gui(gpointer data) {
 // Monitoreo de procesos en hilo separado
 void* hilo_monitoreo(void* arg) {
     while (1) {
+        printf("🧠 Hilo monitoreo de procesos activo...\n");
         DIR* proc = opendir("/proc");
         struct dirent* entry;
         if (!proc) {
@@ -246,6 +247,7 @@ void* hilo_monitoreo(void* arg) {
             float uso_ram = obtener_uso_ram(pid);
 
             if (uso_cpu > UMBRAL_CPU || uso_ram > UMBRAL_RAM) {
+                printf("⚠️ Proceso sospechoso: %s (PID %d) CPU: %.1f RAM: %.1f\n", nombre, pid, uso_cpu, uso_ram);
                 actualizar_proceso_sospechoso(pid, nombre, uso_cpu, uso_ram);
             }
             else {
@@ -254,7 +256,7 @@ void* hilo_monitoreo(void* arg) {
         }
 
         closedir(proc);
-        sleep(1);
+        sleep(10);
     }
     return NULL;
 }
