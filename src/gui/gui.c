@@ -1,29 +1,81 @@
 #include <gtk/gtk.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "gui/gui.h"
 
-// Callbacks de ejemplo (puedes conectar la lógica real después)
-static void on_scan_usb_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Escanear USB...\n");
+// --- Gestión del proceso controller ---
+static pid_t controller_pid = -1;
+
+// Lanza el proceso controller (si no está corriendo)
+int start_controller_process() {
+    if (controller_pid > 0) {
+        // Ya está corriendo
+        return 0;
+    }
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Proceso hijo: ejecuta el controller
+        execl("./great_throne_room/throne_room_controller", "throne_room_controller", NULL);
+        // Si execl falla:
+        perror("execl");
+        exit(EXIT_FAILURE);
+    } else if (pid > 0) {
+        controller_pid = pid;
+        return 1;
+    } else {
+        perror("fork");
+        return -1;
+    }
 }
-static void on_scan_processes_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Escanear procesos...\n");
+
+// Detiene el proceso controller y espera a que termine
+void stop_controller_process() {
+    if (controller_pid > 0) {
+        kill(controller_pid, SIGTERM);
+        waitpid(controller_pid, NULL, 0);
+        controller_pid = -1;
+    }
 }
-static void on_scan_ports_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Escanear puertos...\n");
+
+// --- Función auxiliar para mostrar el reporte en el TextView ---
+static void show_report_in_textview(const char *filename, GtkTextView *textview) {
+    FILE *f = fopen(filename, "r");
+    if (!f) {
+        gtk_text_buffer_set_text(gtk_text_view_get_buffer(textview), "No hay reporte disponible.", -1);
+        return;
+    }
+    char buffer[8192];
+    size_t n = fread(buffer, 1, sizeof(buffer) - 1, f);
+    buffer[n] = '\0';
+    gtk_text_buffer_set_text(gtk_text_view_get_buffer(textview), buffer, -1);
+    fclose(f);
 }
+
+// --- Callbacks de los botones generales ---
 static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Comenzar escaneo general...\n");
+    if (start_controller_process() == 1) {
+        g_print("Escaneo iniciado.\n");
+    } else {
+        g_print("El escaneo ya estaba en ejecución o hubo un error.\n");
+    }
 }
 static void on_stop_scan_clicked(GtkButton *button, gpointer user_data) {
-    g_print("Parar escaneo general...\n");
+    stop_controller_process();
+    g_print("Escaneo detenido.\n");
 }
 static void on_console_command_entered(GtkEntry *entry, gpointer user_data) {
     const gchar *command = gtk_entry_get_text(entry);
     g_print("Comando ingresado: %s\n", command);
     gtk_entry_set_text(entry, ""); // Limpiar entrada
-    // Aquí puedes procesar el comando y mostrar resultado en el textview
+    // Aquí puedes procesar el comando y mostrar resultado en el textview si lo deseas
 }
 
+// --- GUI principal ---
 void run_gui() {
     gtk_init(NULL, NULL);
 
@@ -37,12 +89,13 @@ void run_gui() {
     GtkWidget *main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_container_set_border_width(GTK_CONTAINER(main_vbox), 10);
 
-    // === Sección superior con USB, Procesos y Puertos ===
+    // === Sección superior con USB, Procesos y Puertos (solo visualización) ===
     GtkWidget *sections_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     gtk_widget_set_hexpand(sections_hbox, TRUE);
-    gtk_widget_set_vexpand(sections_hbox, FALSE); // Solo ocupa parte superior
+    gtk_widget_set_vexpand(sections_hbox, FALSE);
 
-    GtkWidget* create_section(const gchar *title, GtkWidget **text_view_out, GtkWidget **button_out, const gchar *button_label) {
+    // Función local para crear cada sección (sin botón)
+    GtkWidget* create_section(const gchar *title, GtkWidget **text_view_out) {
         GtkWidget *frame = gtk_frame_new(title);
         gtk_widget_set_hexpand(frame, TRUE);
         gtk_widget_set_vexpand(frame, TRUE);
@@ -53,23 +106,20 @@ void run_gui() {
         gtk_widget_set_hexpand(text, TRUE);
         gtk_widget_set_vexpand(text, TRUE);
 
-        GtkWidget *button = gtk_button_new_with_label(button_label);
         gtk_box_pack_start(GTK_BOX(vbox), text, TRUE, TRUE, 0);
-        gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
         gtk_container_add(GTK_CONTAINER(frame), vbox);
 
         *text_view_out = text;
-        *button_out = button;
         return frame;
     }
 
-    GtkWidget *usb_text, *usb_scan_btn;
-    GtkWidget *proc_text, *proc_scan_btn;
-    GtkWidget *ports_text, *ports_scan_btn;
+    GtkWidget *usb_text;
+    GtkWidget *proc_text;
+    GtkWidget *ports_text;
 
-    GtkWidget *usb_frame = create_section("Dispositivos USB", &usb_text, &usb_scan_btn, "Escanear USB");
-    GtkWidget *proc_frame = create_section("Procesos Monitoreados", &proc_text, &proc_scan_btn, "Escanear Procesos");
-    GtkWidget *ports_frame = create_section("Puertos Abiertos", &ports_text, &ports_scan_btn, "Escanear Puertos");
+    GtkWidget *usb_frame = create_section("Dispositivos USB", &usb_text);
+    GtkWidget *proc_frame = create_section("Procesos Monitoreados", &proc_text);
+    GtkWidget *ports_frame = create_section("Puertos Abiertos", &ports_text);
 
     gtk_box_pack_start(GTK_BOX(sections_hbox), usb_frame, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sections_hbox), proc_frame, TRUE, TRUE, 0);
@@ -78,13 +128,13 @@ void run_gui() {
     // === Consola expandida (fila inferior) ===
     GtkWidget *console_frame = gtk_frame_new("Consola Interactiva");
     gtk_widget_set_hexpand(console_frame, TRUE);
-    gtk_widget_set_vexpand(console_frame, TRUE); // <- Consola más alta
+    gtk_widget_set_vexpand(console_frame, TRUE);
 
     GtkWidget *console_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     GtkWidget *console_text = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(console_text), FALSE);
     gtk_widget_set_hexpand(console_text, TRUE);
-    gtk_widget_set_vexpand(console_text, TRUE); // <- TextView crece verticalmente
+    gtk_widget_set_vexpand(console_text, TRUE);
 
     GtkWidget *console_entry = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(console_entry), "Escribe un comando y presiona Enter...");
@@ -103,33 +153,24 @@ void run_gui() {
     gtk_box_pack_start(GTK_BOX(controls_hbox), stop_btn, TRUE, TRUE, 0);
 
     // Empaquetar todo en el VBox principal
-    // Crear GtkPaned vertical para dividir las áreas
     GtkWidget *vpaned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
-    
-    // Contenedor para la parte superior (módulos USB, procesos, puertos)
+
     GtkWidget *top_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_box_pack_start(GTK_BOX(top_box), sections_hbox, TRUE, TRUE, 0);
-    
-    // Contenedor inferior ya es console_frame
-    
-    // Añadir ambos al paned
-    gtk_paned_pack1(GTK_PANED(vpaned), top_box, TRUE, FALSE);      // 1era parte
-    gtk_paned_pack2(GTK_PANED(vpaned), console_frame, TRUE, FALSE); // 2da parte
-    
-    // Establecer posición inicial del divisor (ej. 40% arriba)
-    gtk_paned_set_position(GTK_PANED(vpaned), 300);
-    
-    // Añadir paned al vbox principal
-    gtk_box_pack_start(GTK_BOX(main_vbox), vpaned, TRUE, TRUE, 0);
 
+    gtk_paned_pack1(GTK_PANED(vpaned), top_box, TRUE, FALSE);
+    gtk_paned_pack2(GTK_PANED(vpaned), console_frame, TRUE, FALSE);
+
+    // Ajusta el divisor para que la sección superior ocupe ~65% y la consola ~35%
+    // Si la ventana es de 800px de alto, esto deja 520px arriba y 280px abajo.
+    gtk_paned_set_position(GTK_PANED(vpaned), 520);
+
+    gtk_box_pack_start(GTK_BOX(main_vbox), vpaned, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(main_vbox), controls_hbox, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(window), main_vbox);
 
     // Conexión de señales
-    g_signal_connect(usb_scan_btn, "clicked", G_CALLBACK(on_scan_usb_clicked), NULL);
-    g_signal_connect(proc_scan_btn, "clicked", G_CALLBACK(on_scan_processes_clicked), NULL);
-    g_signal_connect(ports_scan_btn, "clicked", G_CALLBACK(on_scan_ports_clicked), NULL);
     g_signal_connect(start_btn, "clicked", G_CALLBACK(on_start_scan_clicked), NULL);
     g_signal_connect(stop_btn, "clicked", G_CALLBACK(on_stop_scan_clicked), NULL);
     g_signal_connect(console_entry, "activate", G_CALLBACK(on_console_command_entered), NULL);
