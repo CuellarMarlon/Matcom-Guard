@@ -1,6 +1,6 @@
-#include <stdio.h> 
-#include "great_throne_room/throne_room.h"
+#include "gui/gui.h"
 
-int main () {
-    controller();
+int main() {
+    run_gui();
+    return 0;
 }
