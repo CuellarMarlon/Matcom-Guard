@@ -30,67 +30,70 @@ void run_gui() {
     // Ventana principal
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Gran Salón del Trono");
-    gtk_window_set_default_size(GTK_WINDOW(window), 1100, 700);
+    gtk_window_maximize(GTK_WINDOW(window));
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     // VBox principal
     GtkWidget *main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_container_set_border_width(GTK_CONTAINER(main_vbox), 10);
 
-    // HBox para las tres secciones
+    // === Sección superior con USB, Procesos y Puertos ===
     GtkWidget *sections_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_widget_set_hexpand(sections_hbox, TRUE);
+    gtk_widget_set_vexpand(sections_hbox, FALSE); // Solo ocupa parte superior
 
-    // --- Sección USB ---
-    GtkWidget *usb_frame = gtk_frame_new("Dispositivos USB");
-    GtkWidget *usb_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *usb_text = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(usb_text), FALSE);
-    gtk_widget_set_size_request(usb_text, 300, 200);
-    GtkWidget *usb_scan_btn = gtk_button_new_with_label("Escanear USB");
-    gtk_box_pack_start(GTK_BOX(usb_vbox), usb_text, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(usb_vbox), usb_scan_btn, FALSE, FALSE, 0);
-    gtk_container_add(GTK_CONTAINER(usb_frame), usb_vbox);
+    GtkWidget* create_section(const gchar *title, GtkWidget **text_view_out, GtkWidget **button_out, const gchar *button_label) {
+        GtkWidget *frame = gtk_frame_new(title);
+        gtk_widget_set_hexpand(frame, TRUE);
+        gtk_widget_set_vexpand(frame, TRUE);
 
-    // --- Sección Procesos ---
-    GtkWidget *proc_frame = gtk_frame_new("Procesos Monitoreados");
-    GtkWidget *proc_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *proc_text = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(proc_text), FALSE);
-    gtk_widget_set_size_request(proc_text, 300, 200);
-    GtkWidget *proc_scan_btn = gtk_button_new_with_label("Escanear Procesos");
-    gtk_box_pack_start(GTK_BOX(proc_vbox), proc_text, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(proc_vbox), proc_scan_btn, FALSE, FALSE, 0);
-    gtk_container_add(GTK_CONTAINER(proc_frame), proc_vbox);
+        GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+        GtkWidget *text = gtk_text_view_new();
+        gtk_text_view_set_editable(GTK_TEXT_VIEW(text), FALSE);
+        gtk_widget_set_hexpand(text, TRUE);
+        gtk_widget_set_vexpand(text, TRUE);
 
-    // --- Sección Puertos ---
-    GtkWidget *ports_frame = gtk_frame_new("Puertos Abiertos");
-    GtkWidget *ports_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *ports_text = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(ports_text), FALSE);
-    gtk_widget_set_size_request(ports_text, 300, 200);
-    GtkWidget *ports_scan_btn = gtk_button_new_with_label("Escanear Puertos");
-    gtk_box_pack_start(GTK_BOX(ports_vbox), ports_text, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(ports_vbox), ports_scan_btn, FALSE, FALSE, 0);
-    gtk_container_add(GTK_CONTAINER(ports_frame), ports_vbox);
+        GtkWidget *button = gtk_button_new_with_label(button_label);
+        gtk_box_pack_start(GTK_BOX(vbox), text, TRUE, TRUE, 0);
+        gtk_box_pack_start(GTK_BOX(vbox), button, FALSE, FALSE, 0);
+        gtk_container_add(GTK_CONTAINER(frame), vbox);
 
-    // Añadir las tres secciones al hbox
+        *text_view_out = text;
+        *button_out = button;
+        return frame;
+    }
+
+    GtkWidget *usb_text, *usb_scan_btn;
+    GtkWidget *proc_text, *proc_scan_btn;
+    GtkWidget *ports_text, *ports_scan_btn;
+
+    GtkWidget *usb_frame = create_section("Dispositivos USB", &usb_text, &usb_scan_btn, "Escanear USB");
+    GtkWidget *proc_frame = create_section("Procesos Monitoreados", &proc_text, &proc_scan_btn, "Escanear Procesos");
+    GtkWidget *ports_frame = create_section("Puertos Abiertos", &ports_text, &ports_scan_btn, "Escanear Puertos");
+
     gtk_box_pack_start(GTK_BOX(sections_hbox), usb_frame, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sections_hbox), proc_frame, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sections_hbox), ports_frame, TRUE, TRUE, 0);
 
-    // --- Consola interactiva ---
+    // === Consola expandida (fila inferior) ===
     GtkWidget *console_frame = gtk_frame_new("Consola Interactiva");
+    gtk_widget_set_hexpand(console_frame, TRUE);
+    gtk_widget_set_vexpand(console_frame, TRUE); // <- Consola más alta
+
     GtkWidget *console_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     GtkWidget *console_text = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(console_text), FALSE);
-    gtk_widget_set_size_request(console_text, -1, 120);
+    gtk_widget_set_hexpand(console_text, TRUE);
+    gtk_widget_set_vexpand(console_text, TRUE); // <- TextView crece verticalmente
+
     GtkWidget *console_entry = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(console_entry), "Escribe un comando y presiona Enter...");
+
     gtk_box_pack_start(GTK_BOX(console_vbox), console_text, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(console_vbox), console_entry, FALSE, FALSE, 0);
     gtk_container_add(GTK_CONTAINER(console_frame), console_vbox);
 
-    // --- Botones de control generales ---
+    // === Botones generales ===
     GtkWidget *controls_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *start_btn = gtk_button_new_with_label("Comenzar escaneo");
     GtkWidget *stop_btn = gtk_button_new_with_label("Parar escaneo");
@@ -99,14 +102,31 @@ void run_gui() {
     gtk_box_pack_start(GTK_BOX(controls_hbox), start_btn, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controls_hbox), stop_btn, TRUE, TRUE, 0);
 
-    // Empaquetar todo en el vbox principal
-    gtk_box_pack_start(GTK_BOX(main_vbox), sections_hbox, FALSE, FALSE, 0);
-    gtk_box_pack_start(GTK_BOX(main_vbox), console_frame, FALSE, FALSE, 0);
+    // Empaquetar todo en el VBox principal
+    // Crear GtkPaned vertical para dividir las áreas
+    GtkWidget *vpaned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
+    
+    // Contenedor para la parte superior (módulos USB, procesos, puertos)
+    GtkWidget *top_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_box_pack_start(GTK_BOX(top_box), sections_hbox, TRUE, TRUE, 0);
+    
+    // Contenedor inferior ya es console_frame
+    
+    // Añadir ambos al paned
+    gtk_paned_pack1(GTK_PANED(vpaned), top_box, TRUE, FALSE);      // 1era parte
+    gtk_paned_pack2(GTK_PANED(vpaned), console_frame, TRUE, FALSE); // 2da parte
+    
+    // Establecer posición inicial del divisor (ej. 40% arriba)
+    gtk_paned_set_position(GTK_PANED(vpaned), 300);
+    
+    // Añadir paned al vbox principal
+    gtk_box_pack_start(GTK_BOX(main_vbox), vpaned, TRUE, TRUE, 0);
+
     gtk_box_pack_start(GTK_BOX(main_vbox), controls_hbox, FALSE, FALSE, 0);
 
     gtk_container_add(GTK_CONTAINER(window), main_vbox);
 
-    // Conectar señales
+    // Conexión de señales
     g_signal_connect(usb_scan_btn, "clicked", G_CALLBACK(on_scan_usb_clicked), NULL);
     g_signal_connect(proc_scan_btn, "clicked", G_CALLBACK(on_scan_processes_clicked), NULL);
     g_signal_connect(ports_scan_btn, "clicked", G_CALLBACK(on_scan_ports_clicked), NULL);
