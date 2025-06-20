@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include "gui/gui.h"
 
 typedef struct {
     int port;
@@ -174,56 +175,62 @@ void clasificar_puertos_abiertos() {
 }
 
 // Imprime resultados con formato organizado y visual
-void imprimir_resultados() {
-    printf("\n=====================================\n");
-    printf(" 🔍 Resultados del escaneo de puertos:\n");
-    printf("=====================================\n\n");
+void imprimir_resultados(GtkTextView *view) {
+    char buffer[512];
+
+    append_text_to_view(view, "\n=====================================\n");
+    append_text_to_view(view, " 🔍 Resultados del escaneo de puertos:\n");
+    append_text_to_view(view, "=====================================\n\n");
 
     if (count_permitidos > 0) {
-        printf("✅ Puertos permitidos abiertos:\n");
+        append_text_to_view(view, "✅ Puertos permitidos abiertos:\n");
         for (int i = 0; i < count_permitidos; ++i) {
             const char *service = get_service_name(open_permitidos[i]);
             if (service != NULL)
-                printf("   - Puerto %d (%s)\n", open_permitidos[i], service);
+                snprintf(buffer, sizeof(buffer), "   - Puerto %d (%s)\n", open_permitidos[i], service);
             else
-                printf("   - Puerto %d (Servicio desconocido)\n", open_permitidos[i]);
+                snprintf(buffer, sizeof(buffer), "   - Puerto %d (Servicio desconocido)\n", open_permitidos[i]);
+            append_text_to_view(view, buffer);
         }
-        printf("\n");
+        append_text_to_view(view, "\n");
     }
 
     if (count_sospechosos > 0) {
-        printf("⚠️ Puertos sospechosos abiertos:\n");
+        append_text_to_view(view, "⚠️ Puertos sospechosos abiertos:\n");
         for (int i = 0; i < count_sospechosos; ++i) {
-            printf("   - Puerto %d (Posible amenaza)\n", open_sospechosos[i]);
+            snprintf(buffer, sizeof(buffer), "   - Puerto %d (Posible amenaza)\n", open_sospechosos[i]);
+            append_text_to_view(view, buffer);
         }
-        printf("\n");
+        append_text_to_view(view, "\n");
     }
 
     if (count_no_permitidos > 0) {
-        printf("🚫 Puertos no permitidos abiertos:\n");
+        append_text_to_view(view, "🚫 Puertos no permitidos abiertos:\n");
         for (int i = 0; i < count_no_permitidos; ++i) {
-            printf("   - Puerto %d (No permitido y sin servicio conocido)\n", open_no_permitidos[i]);
+            snprintf(buffer, sizeof(buffer), "   - Puerto %d (No permitido y sin servicio conocido)\n", open_no_permitidos[i]);
+            append_text_to_view(view, buffer);
         }
-        printf("\n");
+        append_text_to_view(view, "\n");
     }
 
     if (count_intervals > 0) {
-        printf("🔒 Puertos cerrados en intervalos:\n");
+        append_text_to_view(view, "🔒 Puertos cerrados en intervalos:\n");
         for (int i = 0; i < count_intervals; ++i) {
             int start = closed_intervals[i][0];
             int end = closed_intervals[i][1];
             if (start == end)
-                printf("   - Puerto %d cerrado\n", start);
+                snprintf(buffer, sizeof(buffer), "   - Puerto %d cerrado\n", start);
             else
-                printf("   - Puertos %d - %d cerrados\n", start, end);
+                snprintf(buffer, sizeof(buffer), "   - Puertos %d - %d cerrados\n", start, end);
+            append_text_to_view(view, buffer);
         }
-        printf("\n");
+        append_text_to_view(view, "\n");
     }
 }
 
 #define NUM_THREADS 8
 
-void scan_ports_tcp(int start_port, int end_port) {
+void scan_ports_tcp(int start_port, int end_port, GtkTextView *view) {
     pthread_t threads[NUM_THREADS];
     ThreadArgs args[NUM_THREADS];
 
@@ -254,5 +261,5 @@ void scan_ports_tcp(int start_port, int end_port) {
     detectar_intervalos_cerrados();
 
     // Imprimir resultados completos
-    imprimir_resultados();
+    imprimir_resultados(view);
 }

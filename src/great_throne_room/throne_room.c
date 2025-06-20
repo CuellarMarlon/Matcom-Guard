@@ -1,14 +1,18 @@
+
+#include <glib.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <signal.h>
+
 #include "usb.h"
 #include "great_throne_room/throne_room.h"
 #include "processes.h"
 #include "ports.h"
 #include "gui/gui.h"
+
 
 volatile int running = 1;
 
@@ -109,13 +113,13 @@ void controlador_rf2_processes() {
 
 // ===================== RF3: ESCANEO DE PUERTOS =====================
 
-int controlador_rf3_ports() {
+int controlador_rf3_ports(GuiContext *ctx) {
     printf("🚀 [RF3] Iniciando escaneo de puertos\n");
 
     init_previous_states();
 
     while (running) {
-        scan_ports_tcp(1, 65535);
+        scan_ports_tcp(1, 65535, ctx->ports_textview); // <-- pasa el textview aquí
         sleep(10);
     }
 

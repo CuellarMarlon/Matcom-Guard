@@ -4,6 +4,8 @@
 #include <gtk/gtk.h>
 #include <pthread.h>
 #include <sys/types.h>
+#include <glib-2.0/glib/gtypes.h>
+#include <gtk-3.0/gtk/gtktypes.h>
 
 // --- Constantes ---
 #define MAX_PROC 32768

@@ -1,5 +1,4 @@
 #include <stdio.h> 
-
 #include "gui/gui.h"
 
 int main () {

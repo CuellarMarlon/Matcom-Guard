@@ -23,6 +23,12 @@ static void* rf1_thread_fn(void* arg) {
     return NULL;
 }
 
+static void* rf3_thread_fn(void* arg) {
+    printf("🧵 Hilo RF3 iniciado\n");
+    controlador_rf3_ports((GuiContext*)arg);
+    return NULL;
+}
+
 static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
     if (controller_running) {
         g_print("⚠️ Ya hay un escaneo activo.\n");
@@ -40,11 +46,20 @@ static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
 
     // POR ESTO:
     static pthread_t rf1_thread;
+    static pthread_t rf3_thread;
+
     if (pthread_create(&rf1_thread, NULL, rf1_thread_fn, &global_ctx) != 0) {
         perror("❌ Error al crear hilo para RF1");
         controller_running = 0;
     } else {
         g_print("🟢 Hilo RF1 iniciado correctamente\n");
+    }
+
+    if (pthread_create(&rf3_thread, NULL, rf3_thread_fn, &global_ctx) != 0) {
+        perror("❌ Error al crear hilo para RF3");
+        controller_running = 0;
+    } else {
+        g_print("🟢 Hilo RF3 iniciado correctamente\n");
     }
 }
 
