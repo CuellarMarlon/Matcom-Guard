@@ -6,21 +6,57 @@
 #include <pthread.h>
 #include "gui/gui.h"
 #include "great_throne_room/throne_room.h"
+#include "processes.h"
 
 GuiContext global_ctx;
-static pthread_t controller_thread;
+static pthread_t rf1_thread, rf2_thread;
 static int controller_running = 0;
 
-// Hilo que ejecuta el controller
-static void* controller_thread_fn(void* arg) {
-    controller((GuiContext*)arg);
+GtkListStore *process_list_store = NULL;
+
+static void* rf1_thread_fn(void* arg) {
+    controlador_rf1_usb((GuiContext*)arg);
     return NULL;
 }
 
-static void* rf1_thread_fn(void* arg) {
-    printf("🧵 Hilo RF1 iniciado\n");
-    controlador_rf1_usb((GuiContext*)arg);
+static void* rf2_thread_fn(void* arg) {
+    controlador_rf2_processes();
     return NULL;
+}
+
+static GtkWidget* create_section_textview(const gchar *title, GtkTextView **out_view) {
+    GtkWidget *frame = gtk_frame_new(title);
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    GtkWidget *text = gtk_text_view_new();
+    gtk_text_view_set_editable(GTK_TEXT_VIEW(text), FALSE);
+    gtk_widget_set_hexpand(text, TRUE);
+    gtk_widget_set_vexpand(text, TRUE);
+    gtk_box_pack_start(GTK_BOX(vbox), text, TRUE, TRUE, 0);
+    gtk_container_add(GTK_CONTAINER(frame), vbox);
+    *out_view = GTK_TEXT_VIEW(text);
+    return frame;
+}
+
+static GtkWidget* create_section_process_table(GtkWidget **out_treeview) {
+    GtkWidget *frame = gtk_frame_new("Procesos Monitoreados");
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+
+    process_list_store = gtk_list_store_new(5,
+        G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+
+    GtkWidget *treeview = gtk_tree_view_new_with_model(GTK_TREE_MODEL(process_list_store));
+    crear_columnas(treeview);
+    gtk_widget_set_hexpand(treeview, TRUE);
+    gtk_widget_set_vexpand(treeview, TRUE);
+
+    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+    gtk_container_add(GTK_CONTAINER(scrolled), treeview);
+
+    gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
+    gtk_container_add(GTK_CONTAINER(frame), vbox);
+
+    *out_treeview = treeview;
+    return frame;
 }
 
 static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
@@ -30,28 +66,29 @@ static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
     }
 
     set_text_to_view(global_ctx.usb_textview, "");
-    set_text_to_view(global_ctx.proc_textview, "");
-    set_text_to_view(global_ctx.ports_textview, "");
+    set_text_to_view(global_ctx.console_textview, "");
+
+    gtk_list_store_clear(process_list_store);  // limpiar procesos
 
     controller_running = 1;
 
-    // CAMBIAR ESTO:
-    // pthread_create(&controller_thread, NULL, controller_thread_fn, &global_ctx);
-
-    // POR ESTO:
-    static pthread_t rf1_thread;
-    if (pthread_create(&rf1_thread, NULL, rf1_thread_fn, &global_ctx) != 0) {
+    // Lanzar hilo para RF1 (USB)
+    if (pthread_create(&rf1_thread, NULL, rf1_thread_fn, &global_ctx) != 0)
         perror("❌ Error al crear hilo para RF1");
-        controller_running = 0;
-    } else {
-        g_print("🟢 Hilo RF1 iniciado correctamente\n");
-    }
-}
 
+    // Lanzar hilo para RF2 (Procesos)
+    if (pthread_create(&rf2_thread, NULL, rf2_thread_fn, &global_ctx) != 0)
+        perror("❌ Error al crear hilo para RF2");
+
+    // Timer para refrescar GUI de procesos cada 1 segundo
+    g_timeout_add_seconds(1, actualizar_lista_gui, NULL);
+
+    g_print("🟢 Escaneo iniciado\n");
+}
 
 static void on_stop_scan_clicked(GtkButton *button, gpointer user_data) {
     if (controller_running) {
-        detener_controller_desde_gui();  // mata a los procesos hijos
+        detener_controller_desde_gui();
         g_print("🛑 Señal de parada enviada al controlador.\n");
         controller_running = 0;
     } else {
@@ -67,7 +104,6 @@ static void on_console_command_entered(GtkEntry *entry, gpointer user_data) {
     }
 }
 
-// Función principal que arranca la interfaz gráfica
 void run_gui() {
     gtk_init(NULL, NULL);
 
@@ -81,23 +117,9 @@ void run_gui() {
 
     GtkWidget *sections_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
 
-    GtkWidget* create_section(const gchar *title, GtkTextView **text_view_out) {
-        GtkWidget *frame = gtk_frame_new(title);
-        GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-        GtkWidget *text = gtk_text_view_new();
-
-        gtk_text_view_set_editable(GTK_TEXT_VIEW(text), FALSE);
-        gtk_widget_set_vexpand(text, TRUE);
-        gtk_widget_set_hexpand(text, TRUE);
-        gtk_box_pack_start(GTK_BOX(vbox), text, TRUE, TRUE, 0);
-        gtk_container_add(GTK_CONTAINER(frame), vbox);
-        *text_view_out = GTK_TEXT_VIEW(text);
-        return frame;
-    }
-
-    GtkWidget *usb_frame = create_section("Dispositivos USB", &global_ctx.usb_textview);
-    GtkWidget *proc_frame = create_section("Procesos Monitoreados", &global_ctx.proc_textview);
-    GtkWidget *ports_frame = create_section("Puertos Abiertos", &global_ctx.ports_textview);
+    GtkWidget *usb_frame   = create_section_textview("Dispositivos USB", &global_ctx.usb_textview);
+    GtkWidget *proc_frame  = create_section_process_table(&global_ctx.proc_textview);  // TreeView!
+    GtkWidget *ports_frame = create_section_textview("Puertos Abiertos", &global_ctx.ports_textview);
 
     gtk_box_pack_start(GTK_BOX(sections_hbox), usb_frame, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sections_hbox), proc_frame, TRUE, TRUE, 0);
@@ -108,7 +130,6 @@ void run_gui() {
     GtkWidget *console_text = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(console_text), FALSE);
     global_ctx.console_textview = GTK_TEXT_VIEW(console_text);
-
     GtkWidget *console_entry = gtk_entry_new();
     gtk_entry_set_placeholder_text(GTK_ENTRY(console_entry), "Escribe un comando...");
 
