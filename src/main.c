@@ -1,6 +1,8 @@
+#include <stdio.h> 
+
 #include "gui/gui.h"
 
-int main() {
+int main () {
+    
     run_gui();
-    return 0;
 }

@@ -23,7 +23,7 @@ typedef struct {
 extern ProcesoInfo procesos_sospechosos[MAX_PROC];
 extern pthread_mutex_t mutex_procs;
 
-// --- Función principal del controlador gráfico ---
+// --- Función principal del controlador lógico (sin GUI ahora) ---
 int main_controller(int argc, char* argv[]);
 
 // --- Funciones utilitarias ---
@@ -36,4 +36,11 @@ float calcular_uso_cpu(pid_t pid);
 void actualizar_proceso_sospechoso(pid_t pid, const char* nombre, float uso_cpu, float uso_ram);
 void resetear_proceso(pid_t pid);
 
+// --- Funciones gráficas (para integrarse con GUI principal) ---
+gboolean actualizar_lista_gui(gpointer data);
+void crear_columnas(GtkWidget* treeview);
+// extern GtkWidget* treeview;          // <- solo si accedes desde gui.c
+// extern GtkListStore* list_store;     // <- solo si accedes desde gui.c
+
 #endif // MATCOM_GUARD_GUI_H
+

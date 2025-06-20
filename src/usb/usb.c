@@ -47,6 +47,8 @@ usb_monitor_t* usb_monitor_create(const usb_config_t *cfg) {
 }
 
 void usb_monitor_set_callback(usb_monitor_t *mon, usb_alert_cb on_alert, void *user_data) {
+    printf("🧪 usb_monitor_set_callback configurado\n");
+
     mon->callback = on_alert;
     mon->cb_data = user_data;
 }
@@ -124,15 +126,16 @@ static void free_hash_list(file_hash_t *list) {
 void usb_monitor_scan(usb_monitor_t *mon) {
     if (!mon) return;
 
+    char result[8192];
+    result[0] = '\0';
+
     if (access(mon->cfg.mount_point, F_OK) != 0) {
-        char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "🔌 USB no disponible (%s): %s",
+        snprintf(result, sizeof(result),
+                 "🔌 USB no disponible (%s): %s\n",
                  mon->cfg.mount_point,
                  strerror(errno));
-        printf("%s\n", msg);
         if (mon->callback) {
-            mon->callback(msg, mon->cb_data);
+            mon->callback(result, mon->cb_data);
         }
         return;
     }
@@ -144,9 +147,13 @@ void usb_monitor_scan(usb_monitor_t *mon) {
     if (!mon->baseline_ready) {
         mon->baseline = current;
         mon->baseline_ready = 1;
-        printf("✅ Baseline generado.\n");
+        snprintf(result, sizeof(result), "✅ Baseline generado.\n");
+        if (mon->callback) {
+            mon->callback(result, mon->cb_data);
+        }
         return;
     }
+    printf("🧪 Umbral leído desde config: %.5f\n", mon->cfg.change_threshold);
 
     size_t changed = 0, total = 0;
     file_hash_t *f;
@@ -155,18 +162,22 @@ void usb_monitor_scan(usb_monitor_t *mon) {
         total++;
         file_hash_t *old = find_hash(mon->baseline, f->path);
         if (!old) {
-            printf("🆕 Nuevo archivo: %s\n", f->path);
             changed++;
+            snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                     "🆕 Nuevo archivo: %s\n", f->path);
         } else {
             if (memcmp(old->hash, f->hash, SHA256_DIGEST_LENGTH) != 0) {
                 if (old->size != f->size) {
-                    printf("📏 Tamaño del archivo modificado: %s\n", f->path);
+                    snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                             "📏 Tamaño del archivo modificado: %s\n", f->path);
                 } else {
-                    printf("✏️  Contenido del archivo modificado: %s\n", f->path);
+                    snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                             "✏️  Contenido del archivo modificado: %s\n", f->path);
                 }
                 changed++;
             } else if (old->mode != f->mode) {
-                printf("🔐 Permisos cambiados: %s\n", f->path);
+                snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                         "🔐 Permisos cambiados: %s\n", f->path);
                 changed++;
             }
         }
@@ -174,7 +185,8 @@ void usb_monitor_scan(usb_monitor_t *mon) {
 
     for (f = mon->baseline; f; f = f->next) {
         if (!find_hash(current, f->path)) {
-            printf("🗑️  Archivo eliminado: %s\n", f->path);
+            snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                     "🗑️  Archivo eliminado: %s\n", f->path);
             changed++;
             total++;
         }
@@ -182,14 +194,18 @@ void usb_monitor_scan(usb_monitor_t *mon) {
 
     double ratio = (total > 0) ? ((double)changed / total) : 0;
     if (ratio > mon->cfg.change_threshold) {
-        char msg[256];
-        snprintf(msg, sizeof(msg),
-                 "⚠️  ALERTA: %.2f%% de archivos cambiaron (umbral %.2f%%)",
+        snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                 "⚠️  ALERTA: %.2f%% de archivos cambiaron (umbral %.2f%%)\n",
                  ratio * 100, mon->cfg.change_threshold * 100);
-        printf("%s\n", msg);
-        if (mon->callback) {
-            mon->callback(msg, mon->cb_data);
-        }
+    } else if (changed > 0) {
+        snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                 "📊 Cambios detectados: %zu/%zu archivos (%.2f%%)\n",
+                 changed, total, ratio * 100);
+    }
+    
+
+    if (mon->callback) {
+        mon->callback(result, mon->cb_data);
     }
 
     free_hash_list(mon->baseline);
