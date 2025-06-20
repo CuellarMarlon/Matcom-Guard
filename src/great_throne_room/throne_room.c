@@ -109,13 +109,13 @@ void controlador_rf2_processes() {
 
 // ===================== RF3: ESCANEO DE PUERTOS =====================
 
-int controlador_rf3_ports() {
+int controlador_rf3_ports(GuiContext *ctx) {
     printf("🚀 [RF3] Iniciando escaneo de puertos\n");
 
     init_previous_states();
 
     while (running) {
-        scan_ports_tcp(1, 65535);
+        scan_ports_tcp(1, 65535, ctx->ports_textview); // <-- pasa el textview aquí
         sleep(10);
     }
 
