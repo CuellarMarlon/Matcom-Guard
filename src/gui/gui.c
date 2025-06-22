@@ -4,6 +4,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <pty.h>
+#include <errno.h>
+#include <glib.h>
 #include "gui/gui.h"
 #include "great_throne_room/throne_room.h"
 #include "processes.h"
@@ -14,17 +21,80 @@ static int controller_running = 0;
 
 GtkListStore *process_list_store = NULL;
 
+// --- Terminal embebida ---
+static int pty_master_fd = -1;
+static pid_t shell_pid = -1;
+static pthread_t pty_reader_thread;
+
+// Lee la salida del shell y la muestra en la consola de la GUI
+static void* pty_output_reader(void* arg) {
+    char buffer[512];
+    ssize_t n;
+    while ((n = read(pty_master_fd, buffer, sizeof(buffer)-1)) > 0) {
+        buffer[n] = '\0';
+        schedule_append_text(global_ctx.console_textview, buffer);
+    }
+    return NULL;
+}
+
+// Inicializa el shell en un pty y lanza el hilo lector
+static void start_embedded_shell() {
+    if (pty_master_fd != -1) return; // Ya iniciado
+
+    int master, slave;
+    char slave_name[100];
+    struct winsize ws = {24, 80, 0, 0};
+
+    if (openpty(&master, &slave, slave_name, NULL, &ws) == -1) {
+        perror("openpty");
+        return;
+    }
+
+    shell_pid = fork();
+    if (shell_pid == 0) {
+        // Hijo: shell
+        close(master);
+        setsid();
+        ioctl(slave, TIOCSCTTY, 0);
+        dup2(slave, 0);
+        dup2(slave, 1);
+        dup2(slave, 2);
+        close(slave);
+        chdir("/home/marlon/University/Second Year/Second Semester/Operative Systems/06. Project/Matcom-Guard"); // Cambia a tu ruta
+        execl("/bin/bash", "bash", NULL);
+        _exit(127);
+    } else if (shell_pid > 0) {
+        // Padre: GUI
+        close(slave);
+        pty_master_fd = master;
+        pthread_create(&pty_reader_thread, NULL, pty_output_reader, NULL);
+    } else {
+        perror("fork");
+        close(master);
+        close(slave);
+    }
+}
+
+// Envía el comando al shell embebido
+static void on_console_command_entered(GtkEntry *entry, gpointer user_data) {
+    const gchar *command = gtk_entry_get_text(entry);
+    if (command && *command) {
+        char cmd_with_newline[1024];
+        snprintf(cmd_with_newline, sizeof(cmd_with_newline), "%s\n", command);
+        write(pty_master_fd, cmd_with_newline, strlen(cmd_with_newline));
+        gtk_entry_set_text(entry, "");
+    }
+}
+
 static void* rf1_thread_fn(void* arg) {
     controlador_rf1_usb((GuiContext*)arg);
     return NULL;
 }
 
-
 static void* rf2_thread_fn(void* arg) {
     controlador_rf2_processes();
     return NULL;
 }
-
 
 static void* rf3_thread_fn(void* arg) {
     controlador_rf3_ports((GuiContext*)arg);
@@ -114,14 +184,6 @@ static void on_stop_scan_clicked(GtkButton *button, gpointer user_data) {
     }
 }
 
-static void on_console_command_entered(GtkEntry *entry, gpointer user_data) {
-    const gchar *command = gtk_entry_get_text(entry);
-    if (command && *command) {
-        append_text_to_view(global_ctx.console_textview, command);
-        gtk_entry_set_text(entry, "");
-    }
-}
-
 void run_gui() {
     gtk_init(NULL, NULL);
 
@@ -186,6 +248,9 @@ void run_gui() {
     g_signal_connect(start_btn, "clicked", G_CALLBACK(on_start_scan_clicked), NULL);
     g_signal_connect(stop_btn, "clicked", G_CALLBACK(on_stop_scan_clicked), NULL);
     g_signal_connect(console_entry, "activate", G_CALLBACK(on_console_command_entered), NULL);
+
+    // --- INICIA LA TERMINAL EMBEBIDA ---
+    start_embedded_shell();
 
     gtk_widget_show_all(window);
     gtk_main();
