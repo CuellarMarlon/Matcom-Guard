@@ -26,6 +26,13 @@ static int pty_master_fd = -1;
 static pid_t shell_pid = -1;
 static pthread_t pty_reader_thread;
 
+// Aplica fuente monoespaciada y tamaño grande a un GtkTextView
+static void style_textview(GtkWidget *textview) {
+    PangoFontDescription *font_desc = pango_font_description_from_string("monospace 13");
+    gtk_widget_override_font(textview, font_desc);
+    pango_font_description_free(font_desc);
+}
+
 // Lee la salida del shell y la muestra en la consola de la GUI
 static void* pty_output_reader(void* arg) {
     char buffer[512];
@@ -114,6 +121,8 @@ static GtkWidget* create_section_textview(const gchar *title, GtkTextView **out_
     gtk_text_view_set_editable(GTK_TEXT_VIEW(text), FALSE);
     gtk_widget_set_hexpand(text, TRUE);
     gtk_widget_set_vexpand(text, TRUE);
+
+    style_textview(text);
 
     gtk_container_add(GTK_CONTAINER(scrolled), text);
     gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
@@ -215,6 +224,7 @@ void run_gui() {
 
     GtkWidget *console_text = gtk_text_view_new();
     gtk_text_view_set_editable(GTK_TEXT_VIEW(console_text), FALSE);
+    style_textview(console_text);
     gtk_container_add(GTK_CONTAINER(console_scrolled), console_text);
 
     global_ctx.console_textview = GTK_TEXT_VIEW(console_text);
