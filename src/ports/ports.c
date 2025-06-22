@@ -178,43 +178,43 @@ void clasificar_puertos_abiertos() {
 void imprimir_resultados(GtkTextView *view) {
     char buffer[512];
 
-    append_text_to_view(view, "\n=====================================\n");
-    append_text_to_view(view, " 🔍 Resultados del escaneo de puertos:\n");
-    append_text_to_view(view, "=====================================\n\n");
+    schedule_append_text(view,  "\n=====================================\n");
+    schedule_append_text(view,  " 🔍 Resultados del escaneo de puertos:\n");
+    schedule_append_text(view,  "=====================================\n\n");
 
     if (count_permitidos > 0) {
-        append_text_to_view(view, "✅ Puertos permitidos abiertos:\n");
+        schedule_append_text(view,  "✅ Puertos permitidos abiertos:\n");
         for (int i = 0; i < count_permitidos; ++i) {
             const char *service = get_service_name(open_permitidos[i]);
             if (service != NULL)
                 snprintf(buffer, sizeof(buffer), "   - Puerto %d (%s)\n", open_permitidos[i], service);
             else
                 snprintf(buffer, sizeof(buffer), "   - Puerto %d (Servicio desconocido)\n", open_permitidos[i]);
-            append_text_to_view(view, buffer);
+            schedule_append_text(view,  buffer);
         }
-        append_text_to_view(view, "\n");
+        schedule_append_text(view,  "\n");
     }
 
     if (count_sospechosos > 0) {
-        append_text_to_view(view, "⚠️ Puertos sospechosos abiertos:\n");
+        schedule_append_text(view,  "⚠️ Puertos sospechosos abiertos:\n");
         for (int i = 0; i < count_sospechosos; ++i) {
             snprintf(buffer, sizeof(buffer), "   - Puerto %d (Posible amenaza)\n", open_sospechosos[i]);
-            append_text_to_view(view, buffer);
+            schedule_append_text(view,  buffer);
         }
-        append_text_to_view(view, "\n");
+        schedule_append_text(view,  "\n");
     }
 
     if (count_no_permitidos > 0) {
-        append_text_to_view(view, "🚫 Puertos no permitidos abiertos:\n");
+        schedule_append_text(view,  "🚫 Puertos no permitidos abiertos:\n");
         for (int i = 0; i < count_no_permitidos; ++i) {
             snprintf(buffer, sizeof(buffer), "   - Puerto %d (No permitido y sin servicio conocido)\n", open_no_permitidos[i]);
-            append_text_to_view(view, buffer);
+            schedule_append_text(view,  buffer);
         }
-        append_text_to_view(view, "\n");
+        schedule_append_text(view,  "\n");
     }
 
     if (count_intervals > 0) {
-        append_text_to_view(view, "🔒 Puertos cerrados en intervalos:\n");
+        schedule_append_text(view,  "🔒 Puertos cerrados en intervalos:\n");
         for (int i = 0; i < count_intervals; ++i) {
             int start = closed_intervals[i][0];
             int end = closed_intervals[i][1];
@@ -222,9 +222,9 @@ void imprimir_resultados(GtkTextView *view) {
                 snprintf(buffer, sizeof(buffer), "   - Puerto %d cerrado\n", start);
             else
                 snprintf(buffer, sizeof(buffer), "   - Puertos %d - %d cerrados\n", start, end);
-            append_text_to_view(view, buffer);
+            schedule_append_text(view,  buffer);
         }
-        append_text_to_view(view, "\n");
+        schedule_append_text(view,  "\n");
     }
 }
 
