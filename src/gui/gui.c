@@ -14,6 +14,7 @@
 #include "gui/gui.h"
 #include "great_throne_room/throne_room.h"
 #include "processes.h"
+#include <vte/vte.h>
 
 GuiContext global_ctx;
 static pthread_t rf1_thread, rf2_thread, rf3_thread;
@@ -39,7 +40,7 @@ static void* pty_output_reader(void* arg) {
     ssize_t n;
     while ((n = read(pty_master_fd, buffer, sizeof(buffer)-1)) > 0) {
         buffer[n] = '\0';
-        schedule_append_text(global_ctx.console_textview, buffer);
+        agendar_agregar_texto(global_ctx.console_textview, buffer);
     }
     return NULL;
 }
@@ -99,12 +100,12 @@ static void* rf1_thread_fn(void* arg) {
 }
 
 static void* rf2_thread_fn(void* arg) {
-    controlador_rf2_processes();
+    controlador_rf2_procesos();
     return NULL;
 }
 
 static void* rf3_thread_fn(void* arg) {
-    controlador_rf3_ports((GuiContext*)arg);
+    controlador_rf3_puertos((GuiContext*)arg);
     return NULL;
 }
 
@@ -185,7 +186,7 @@ static void on_start_scan_clicked(GtkButton *button, gpointer user_data) {
 
 static void on_stop_scan_clicked(GtkButton *button, gpointer user_data) {
     if (controller_running) {
-        detener_controller_desde_gui();
+        detener_controlador_desde_gui();
         g_print("🛑 Señal de parada enviada al controlador.\n");
         controller_running = 0;
     } else {
@@ -214,26 +215,33 @@ void run_gui() {
     gtk_box_pack_start(GTK_BOX(sections_hbox), proc_frame, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(sections_hbox), ports_frame, TRUE, TRUE, 0);
 
-    // Consola con scroll
+    // --- TERMINAL REAL ---
     GtkWidget *console_frame = gtk_frame_new("Consola Interactiva");
     GtkWidget *console_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
 
-    GtkWidget *console_scrolled = gtk_scrolled_window_new(NULL, NULL);
-    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(console_scrolled),
-                                    GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
+    VteTerminal *terminal = VTE_TERMINAL(vte_terminal_new());
+    gtk_widget_set_hexpand(GTK_WIDGET(terminal), TRUE);
+    gtk_widget_set_vexpand(GTK_WIDGET(terminal), TRUE);
 
-    GtkWidget *console_text = gtk_text_view_new();
-    gtk_text_view_set_editable(GTK_TEXT_VIEW(console_text), FALSE);
-    style_textview(console_text);
-    gtk_container_add(GTK_CONTAINER(console_scrolled), console_text);
+    // Lanzar bash dentro del terminal
+    char *argv[] = {"/bin/bash", NULL};
+    vte_terminal_spawn_async(
+        terminal,
+        VTE_PTY_DEFAULT,
+        NULL,       // working directory
+        argv,       // command
+        NULL,       // env
+        0,          // flags
+        NULL,       // child setup
+        NULL,       // child setup data
+        NULL,       // child setup data destroy
+        -1,         // timeout
+        NULL,       // cancellable
+        NULL,       // callback
+        NULL        // user_data
+    );
 
-    global_ctx.console_textview = GTK_TEXT_VIEW(console_text);
-
-    GtkWidget *console_entry = gtk_entry_new();
-    gtk_entry_set_placeholder_text(GTK_ENTRY(console_entry), "Escribe un comando...");
-
-    gtk_box_pack_start(GTK_BOX(console_vbox), console_scrolled, TRUE, TRUE, 0);
-    gtk_box_pack_start(GTK_BOX(console_vbox), console_entry, FALSE, FALSE, 0);
+    gtk_box_pack_start(GTK_BOX(console_vbox), GTK_WIDGET(terminal), TRUE, TRUE, 0);
     gtk_container_add(GTK_CONTAINER(console_frame), console_vbox);
 
     GtkWidget *controls_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
@@ -257,7 +265,6 @@ void run_gui() {
 
     g_signal_connect(start_btn, "clicked", G_CALLBACK(on_start_scan_clicked), NULL);
     g_signal_connect(stop_btn, "clicked", G_CALLBACK(on_stop_scan_clicked), NULL);
-    g_signal_connect(console_entry, "activate", G_CALLBACK(on_console_command_entered), NULL);
 
     // --- INICIA LA TERMINAL EMBEBIDA ---
     start_embedded_shell();

@@ -10,15 +10,15 @@
 #include "ports.h"
 #include "gui/gui.h"
 
-volatile int running = 1;
+volatile int ejecutando = 1;
 
 static pid_t pid_usb = -1, pid_proc1 = -1, pid_proc2 = -1;
 
 // Manejador de señales
-void handle_termination(int sig) {
+void manejador_terminacion(int sig) {
     (void)sig;
     printf("\n🚨 Señal recibida. Finalizando...\n");
-    running = 0;
+    ejecutando = 0;
 
     if (pid_usb > 0) kill(pid_usb, SIGTERM);
     if (pid_proc1 > 0) kill(pid_proc1, SIGTERM);
@@ -28,43 +28,43 @@ void handle_termination(int sig) {
     exit(0);
 }
 
-void detener_controller_desde_gui() {
-    handle_termination(0);
+void detener_controlador_desde_gui() {
+    manejador_terminacion(0);
 }
 
 // ===================== FUNCIONES THREAD-SAFE PARA GTK =====================
 
 typedef struct {
-    GtkTextView *view;
-    char *text;
-} IdleUpdateData;
+    GtkTextView *vista;
+    char *texto;
+} DatosActualizacionIdle;
 
-gboolean idle_append_text(gpointer user_data) {
-    IdleUpdateData *d = (IdleUpdateData*)user_data;
-    append_text_to_view(d->view, d->text);
-    g_free(d->text);
+gboolean idle_agregar_texto(gpointer datos_usuario) {
+    DatosActualizacionIdle *d = (DatosActualizacionIdle*)datos_usuario;
+    append_text_to_view(d->vista, d->texto);
+    g_free(d->texto);
     g_free(d);
     return FALSE;
 }
 
-void schedule_append_text(GtkTextView *view, const char *msg) {
-    if (!view || !msg) return;
-    IdleUpdateData *d = g_new(IdleUpdateData, 1);
-    d->view = view;
-    d->text = g_strdup(msg);
-    g_idle_add(idle_append_text, d);
+void agendar_agregar_texto(GtkTextView *vista, const char *mensaje) {
+    if (!vista || !mensaje) return;
+    DatosActualizacionIdle *d = g_new(DatosActualizacionIdle, 1);
+    d->vista = vista;
+    d->texto = g_strdup(mensaje);
+    g_idle_add(idle_agregar_texto, d);
 }
 
 // ===================== RF1: MONITOREO USB =====================
 
-void alert_handler(const char *msg, void *user_data) {
-    GuiContext *ctx = (GuiContext *)user_data;
+void manejador_alerta(const char *mensaje, void *datos_usuario) {
+    GuiContext *ctx = (GuiContext *)datos_usuario;
 
-    printf("🔔 [alert_handler] %s\n", msg);
+    printf("🔔 [manejador_alerta] %s\n", mensaje);
     if (!ctx || !ctx->usb_textview) return;
 
-    schedule_append_text(ctx->usb_textview, msg);
-    schedule_append_text(ctx->usb_textview, "\n");
+    agendar_agregar_texto(ctx->usb_textview, mensaje);
+    agendar_agregar_texto(ctx->usb_textview, "\n");
 }
 
 void controlador_rf1_usb(GuiContext* ctx) {
@@ -72,35 +72,35 @@ void controlador_rf1_usb(GuiContext* ctx) {
 
     usb_config_t cfg;
     if (load_usb_config("config/matcomguard.conf", &cfg) != 0) {
-        schedule_append_text(ctx->usb_textview, "❌ No se pudo cargar la configuración USB.\n");
+        agendar_agregar_texto(ctx->usb_textview, "❌ No se pudo cargar la configuración USB.\n");
         return;
     }
 
     usb_monitor_t *mon = usb_monitor_create(&cfg);
-    usb_monitor_set_callback(mon, alert_handler, ctx);
+    usb_monitor_set_callback(mon, manejador_alerta, ctx);
 
-    schedule_append_text(ctx->usb_textview, "📦 Escaneo inicial...\n");
+    agendar_agregar_texto(ctx->usb_textview, "📦 Escaneo inicial...\n");
     usb_monitor_scan(mon);
 
-    while (running) {
+    while (ejecutando) {
         printf("🔁 [controlador_rf1_usb] Escaneo USB...\n");
         sleep(cfg.scan_interval);
         usb_monitor_scan(mon);
     }
 
     usb_monitor_destroy(mon);
-    schedule_append_text(ctx->usb_textview, "🛑 USB Monitor finalizado.\n");
+    agendar_agregar_texto(ctx->usb_textview, "🛑 USB Monitor finalizado.\n");
 }
 
 
 // ===================== RF2: MONITOREO DE PROCESOS =====================
 
-void controlador_rf2_processes() {
+void controlador_rf2_procesos() {
     printf("🚀 [RF2] Iniciando monitoreo de procesos\n");
 
-    main_controller(NULL, NULL);
+    main_controller(0, NULL);
 
-    while (running) {
+    while (ejecutando) {
         sleep(1);
     }
 
@@ -109,57 +109,16 @@ void controlador_rf2_processes() {
 
 // ===================== RF3: ESCANEO DE PUERTOS =====================
 
-int controlador_rf3_ports(GuiContext *ctx) {
+int controlador_rf3_puertos(GuiContext *ctx) {
     printf("🚀 [RF3] Iniciando escaneo de puertos\n");
 
-    init_previous_states();
+    inicializar_estados_previos();
 
-    while (running) {
-        scan_ports_tcp(1, 65535, ctx->ports_textview); // <-- pasa el textview aquí
+    while (ejecutando) {
+        escanear_puertos_tcp(1, 65535, ctx->ports_textview);
         sleep(10);
     }
 
     printf("🛑 RF3 terminado\n");
     return 0;
 }
-
-// ===================== FUNCIÓN PRINCIPAL CONTROLLER =====================
-
-void controller(GuiContext *ctx) {
-    // signal(SIGINT, handle_termination);
-    // signal(SIGTERM, handle_termination);
-
-    // pid_usb = fork();
-    // if (pid_usb == 0) {
-    //     controlador_rf1_usb(ctx);
-    //     exit(EXIT_SUCCESS);
-    // }
-
-    // pid_proc1 = fork();
-    // if (pid_proc1 == 0) {
-    //     controlador_rf2_processes();
-    //     exit(EXIT_SUCCESS);
-    // }
-
-    // pid_proc2 = fork();
-    // if (pid_proc2 == 0) {
-    //     controlador_rf3_ports();
-    //     exit(EXIT_SUCCESS);
-    // }
-
-    // // Proceso padre espera a los hijos
-    // int status;
-    // pid_t wpid;
-    // int count = 0;
-    // while ((wpid = wait(&status)) > 0 && count < 3) {
-    //     if (WIFEXITED(status)) {
-    //         printf("✔️ Proceso hijo %d terminó con código %d\n", wpid, WEXITSTATUS(status));
-    //     } else if (WIFSIGNALED(status)) {
-    //         printf("❌ Proceso hijo %d fue terminado por señal %d\n", wpid, WTERMSIG(status));
-    //     }
-    //     count++;
-    // }
-
-    // printf("✅ Todos los procesos hijos han finalizado.\n");
-}
-

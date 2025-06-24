@@ -1,10 +1,12 @@
-#ifndef CONTROLLER_H
-#define CONTROLLER_H
+#ifndef THRONE_ROOM_H
+#define THRONE_ROOM_H
 
-#include "gui/gui.h"  // asegúrate de que tienes acceso a GuiContext
+#include "gui/gui.h"  // Para GuiContext
 
-void controller(GuiContext *ctx);
-
-void detener_controller_desde_gui(void);  // <-- Agrega esta línea
+void controlador_principal(GuiContext *ctx);
+void detener_controlador_desde_gui(void);
+void controlador_rf1_usb(GuiContext *ctx);
+void controlador_rf2_procesos(void);
+int  controlador_rf3_puertos(GuiContext *ctx);
 
 #endif

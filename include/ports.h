@@ -1,8 +1,9 @@
-#include <gtk/gtk.h>
 #ifndef PORTS_H
 #define PORTS_H
 
-void scan_ports_tcp(int start_port, int end_port, GtkTextView *view);
-void init_previous_states();
+#include <gtk/gtk.h>
+
+void escanear_puertos_tcp(int puerto_inicio, int puerto_fin, GtkTextView *vista);
+void inicializar_estados_previos();
 
 #endif

@@ -6,8 +6,8 @@ INCLUDE_DIR = include
 TARGET = $(BIN_DIR)/matcomguard
 
 # Flags de compilación y enlace
-CFLAGS = -Wall -Wextra -I$(INCLUDE_DIR) `pkg-config --cflags gtk+-3.0`
-LDFLAGS = `pkg-config --libs gtk+-3.0` -lcrypto
+CFLAGS = -Wall -Wextra -I$(INCLUDE_DIR) `pkg-config --cflags gtk+-3.0` `pkg-config --cflags vte-2.91`
+LDFLAGS = `pkg-config --libs gtk+-3.0` -lcrypto `pkg-config --libs vte-2.91`
 
 # Buscar fuentes y objetos
 SRCS := $(shell find $(SRC_DIR) -name '*.c')
