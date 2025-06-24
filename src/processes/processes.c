@@ -10,12 +10,14 @@
 #include <signal.h>
 #include <time.h>
 #include "processes.h"
+#include "great_throne_room/throne_room.h"
 
 // --- Constantes y configuración ---
 #define MAX_PROC 32768
 #define MAX_WHITELIST 32
 
 extern GtkListStore* process_list_store;
+// extern volatile int ejecutando; // <--- Solo declaración, NO definición
 
 int UMBRAL_CPU = 70;
 int UMBRAL_RAM = 2;
@@ -27,8 +29,6 @@ int WHITELIST_LEN = 4;
 // --- Variables globales ---
 ProcesoInfo procesos_sospechosos[MAX_PROC];
 pthread_mutex_t mutex_procs = PTHREAD_MUTEX_INITIALIZER;
-
-extern GtkListStore* process_list_store;
 
 // --- Funciones auxiliares ---
 int es_numero(const char* str) {
@@ -204,7 +204,7 @@ gboolean actualizar_lista_gui(gpointer data) {
 
 // --- Monitoreo en hilo ---
 void* hilo_monitoreo(void* arg) {
-    while (1) {
+    while (ejecutando) {
         printf("🧠 Hilo monitoreo de procesos activo...\n");
 
         DIR* proc = opendir("/proc");
@@ -259,7 +259,6 @@ void* hilo_monitoreo(void* arg) {
     return NULL;
 }
 
-
 void crear_columnas(GtkWidget* treeview) {
     GtkCellRenderer* renderer;
 
@@ -284,5 +283,3 @@ int main_controller(int argc, char* argv[]) {
     pthread_create(&tid, NULL, hilo_monitoreo, NULL);
     return 0;
 }
-
-//-----------------------------------------------------------

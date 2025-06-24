@@ -2,7 +2,7 @@
 #define THRONE_ROOM_H
 
 #include "gui/gui.h"  // Para GuiContext
-
+extern volatile int ejecutando; // Definición real en throne_room.c
 void controlador_principal(GuiContext *ctx);
 void detener_controlador_desde_gui(void);
 void controlador_rf1_usb(GuiContext *ctx);

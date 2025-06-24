@@ -88,7 +88,7 @@ static void on_console_command_entered(GtkEntry *entry, gpointer user_data) {
     const gchar *command = gtk_entry_get_text(entry);
     if (command && *command) {
         char cmd_with_newline[1024];
-        snprintf(cmd_with_newline, sizeof(cmd_with_newline), "%s\n", command);
+        printf(cmd_with_newline, sizeof(cmd_with_newline), "%s\n", command);
         write(pty_master_fd, cmd_with_newline, strlen(cmd_with_newline));
         gtk_entry_set_text(entry, "");
     }
@@ -109,6 +109,24 @@ static void* rf3_thread_fn(void* arg) {
     return NULL;
 }
 
+// Limpiar USB
+static void on_clear_usb_clicked(GtkButton *button, gpointer user_data) {
+    GtkTextView *textview = (GtkTextView*)user_data;
+    set_text_to_view(textview, "");
+}
+
+// Limpiar Puertos
+static void on_clear_ports_clicked(GtkButton *button, gpointer user_data) {
+    GtkTextView *textview = (GtkTextView*)user_data;
+    set_text_to_view(textview, "");
+}
+
+// Limpiar la tabla de procesos
+static void on_clear_proc_clicked(GtkButton *button, gpointer user_data) {
+    if (process_list_store)
+        gtk_list_store_clear(process_list_store);
+}
+
 // Sección scrollable con GtkTextView (para USB y Puertos)
 static GtkWidget* create_section_textview(const gchar *title, GtkTextView **out_view) {
     GtkWidget *frame = gtk_frame_new(title);
@@ -127,6 +145,20 @@ static GtkWidget* create_section_textview(const gchar *title, GtkTextView **out_
 
     gtk_container_add(GTK_CONTAINER(scrolled), text);
     gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
+
+    // Botón limpiar pequeño alineado a la derecha
+    GtkWidget *hbox_btn = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *clear_btn = gtk_button_new_with_label("Limpiar");
+    gtk_widget_set_size_request(clear_btn, 60, 24);
+    gtk_box_pack_end(GTK_BOX(hbox_btn), clear_btn, FALSE, FALSE, 0);
+    gtk_box_pack_end(GTK_BOX(vbox), hbox_btn, FALSE, FALSE, 0);
+
+    // Conectar señal según el título
+    if (g_strcmp0(title, "Dispositivos USB") == 0)
+        g_signal_connect(clear_btn, "clicked", G_CALLBACK(on_clear_usb_clicked), text);
+    else
+        g_signal_connect(clear_btn, "clicked", G_CALLBACK(on_clear_ports_clicked), text);
+
     gtk_container_add(GTK_CONTAINER(frame), vbox);
 
     *out_view = GTK_TEXT_VIEW(text);
@@ -152,6 +184,17 @@ static GtkWidget* create_section_process_table(GtkWidget **out_treeview) {
     gtk_container_add(GTK_CONTAINER(scrolled), treeview);
 
     gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 0);
+
+    // Botón limpiar pequeño alineado a la derecha
+    GtkWidget *hbox_btn = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *clear_btn = gtk_button_new_with_label("Limpiar");
+    gtk_widget_set_size_request(clear_btn, 60, 24);
+    gtk_box_pack_end(GTK_BOX(hbox_btn), clear_btn, FALSE, FALSE, 0);
+    gtk_box_pack_end(GTK_BOX(vbox), hbox_btn, FALSE, FALSE, 0);
+
+    // Conectar señal
+    g_signal_connect(clear_btn, "clicked", G_CALLBACK(on_clear_proc_clicked), NULL);
+
     gtk_container_add(GTK_CONTAINER(frame), vbox);
 
     *out_treeview = treeview;
@@ -194,12 +237,47 @@ static void on_stop_scan_clicked(GtkButton *button, gpointer user_data) {
     }
 }
 
+// Función para cerrar la aplicación
+static void on_exit_clicked(GtkButton *button, gpointer user_data) {
+    gtk_main_quit();
+}
+
+void mostrar_panel_intro(GtkWidget *window_principal) {
+    GtkWidget *splash = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(splash), "Bienvenido a MatcomGuard");
+    gtk_window_set_default_size(GTK_WINDOW(splash), 400, 200);
+
+    // Poner la ventana splash en pantalla completa
+    gtk_window_fullscreen(GTK_WINDOW(splash));
+
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+
+    // Texto grande y centrado usando markup
+    GtkWidget *label = gtk_label_new(NULL);
+    gtk_label_set_markup(GTK_LABEL(label),
+        "<span font='32' weight='bold'>¡Bienvenido a MatcomGuard!</span>\n\n"
+        "<span font='20'>Protegiendo tu sistema...</span>");
+    gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
+    gtk_label_set_xalign(GTK_LABEL(label), 0.5);
+
+    gtk_box_pack_start(GTK_BOX(vbox), label, TRUE, TRUE, 0);
+    gtk_container_add(GTK_CONTAINER(splash), vbox);
+
+    gtk_widget_show_all(splash);
+
+    // Después de 3 segundos, cerrar splash y mostrar la ventana principal (con todo su contenido)
+    g_timeout_add_seconds(3, (GSourceFunc)gtk_widget_show_all, window_principal);
+    g_timeout_add_seconds(3, (GSourceFunc)gtk_widget_destroy, splash);
+}
+
 void run_gui() {
     gtk_init(NULL, NULL);
 
+    // --- Ventana principal (no la muestres aún) ---
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Gran Salón del Trono");
-    gtk_window_maximize(GTK_WINDOW(window));
+    gtk_window_fullscreen(GTK_WINDOW(window));
+    // gtk_window_maximize(GTK_WINDOW(window));
     g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
 
     GtkWidget *main_vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -247,9 +325,11 @@ void run_gui() {
     GtkWidget *controls_hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *start_btn = gtk_button_new_with_label("Comenzar escaneo");
     GtkWidget *stop_btn  = gtk_button_new_with_label("Parar escaneo");
+    GtkWidget *exit_btn  = gtk_button_new_with_label("Salir"); // <--- Nuevo botón
 
     gtk_box_pack_start(GTK_BOX(controls_hbox), start_btn, TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(controls_hbox), stop_btn, TRUE, TRUE, 0);
+    gtk_box_pack_start(GTK_BOX(controls_hbox), exit_btn, TRUE, TRUE, 0); // <--- Añadir al hbox
 
     GtkWidget *vpaned = gtk_paned_new(GTK_ORIENTATION_VERTICAL);
     GtkWidget *top_box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -265,10 +345,13 @@ void run_gui() {
 
     g_signal_connect(start_btn, "clicked", G_CALLBACK(on_start_scan_clicked), NULL);
     g_signal_connect(stop_btn, "clicked", G_CALLBACK(on_stop_scan_clicked), NULL);
+    g_signal_connect(exit_btn, "clicked", G_CALLBACK(on_exit_clicked), NULL); // <--- Conectar señal
 
     // --- INICIA LA TERMINAL EMBEBIDA ---
     start_embedded_shell();
 
-    gtk_widget_show_all(window);
+    // Llama primero al panel introductorio:
+    mostrar_panel_intro(window);
+
     gtk_main();
 }

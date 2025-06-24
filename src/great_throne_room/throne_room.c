@@ -10,11 +10,29 @@
 #include "ports.h"
 #include "gui/gui.h"
 
-volatile int ejecutando = 1;
+volatile int ejecutando = 1; // <--- ÚNICA definición real
 
 static pid_t pid_usb = -1, pid_proc1 = -1, pid_proc2 = -1;
 
-// Manejador de señales
+// Nueva función: solo detiene los procesos hijos, no termina la app
+void detener_controlador_desde_gui() {
+    ejecutando = 0;
+
+    if (pid_usb > 0) {
+        kill(pid_usb, SIGTERM);
+        pid_usb = -1;
+    }
+    if (pid_proc1 > 0) {
+        kill(pid_proc1, SIGTERM);
+        pid_proc1 = -1;
+    }
+    if (pid_proc2 > 0) {
+        kill(pid_proc2, SIGTERM);
+        pid_proc2 = -1;
+    }
+}
+
+// Manejador de señales: sigue cerrando todo (incluye exit)
 void manejador_terminacion(int sig) {
     (void)sig;
     printf("\n🚨 Señal recibida. Finalizando...\n");
@@ -26,10 +44,6 @@ void manejador_terminacion(int sig) {
 
     sleep(1);
     exit(0);
-}
-
-void detener_controlador_desde_gui() {
-    manejador_terminacion(0);
 }
 
 // ===================== FUNCIONES THREAD-SAFE PARA GTK =====================
@@ -119,6 +133,6 @@ int controlador_rf3_puertos(GuiContext *ctx) {
         sleep(10);
     }
 
-    printf("🛑 RF3 terminado\n");
+    agendar_agregar_texto(ctx->ports_textview, "🛑 RF3 finalizado.\n");
     return 0;
 }
