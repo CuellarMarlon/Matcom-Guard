@@ -28,17 +28,30 @@ show_menu() {
     echo "18 - Servidor HTTP puerto 4444"
     echo "19 - Cerrar servidor HTTP"
     echo "20 - Alternar puerto 77"
+    echo "21 - Cambiar timestamp de archivo"
+    echo "22 - Cambiar ownership (propietario) de archivo"
     echo "0 - Salir"
     echo ""
 }
 
-crear_fake_usb() { mkdir -p "$FAKE_USB_DIR"; echo "Archivo original 1" > "$FAKE_USB_DIR/file1.txt"; echo "Archivo original 2" > "$FAKE_USB_DIR/file2.txt"; echo "✅ Carpeta y archivos creados."; }
+crear_fake_usb() {
+    mkdir -p "$FAKE_USB_DIR"
+
+    for i in {1..6}; do
+        subdir="$FAKE_USB_DIR/file$i"
+        mkdir -p "$subdir"
+        echo "Contenido del archivo $i" > "$subdir/file$i.txt"
+    done
+
+    echo "✅ Carpeta y 6 subdirectorios con archivos creados."
+}
+
 eliminar_fake_usb() { rm -rf "$FAKE_USB_DIR"; echo "🗑 Carpeta eliminada."; }
 agregar_archivo() { echo "Este es un nuevo archivo" > "$FAKE_USB_DIR/file_nuevo.txt"; echo "✅ Archivo nuevo creado."; }
-eliminar_archivo() { rm -f "$FAKE_USB_DIR/file2.txt"; echo "🗑 Archivo eliminado."; }
-modificar_tamano() { [[ -f "$FAKE_USB_DIR/file1.txt" ]] && echo "Línea adicional de prueba" >> "$FAKE_USB_DIR/file1.txt" && echo "📏 Tamaño modificado." || echo "⚠️ El archivo file1.txt no existe."; }
-cambiar_permisos() { [[ -f "$FAKE_USB_DIR/file1.txt" ]] && chmod 777 "$FAKE_USB_DIR/file1.txt" && echo "🔐 Permisos cambiados a 777." || echo "⚠️ El archivo file1.txt no existe."; }
-renombrar_archivo() { [[ -f "$FAKE_USB_DIR/file1.txt" ]] && mv "$FAKE_USB_DIR/file1.txt" "$FAKE_USB_DIR/file1_renombrado.txt" && echo "🔁 Archivo renombrado." || echo "⚠️ El archivo file1.txt no existe."; }
+eliminar_archivo() { rm -f "$FAKE_USB_DIR/file2/file2.txt"; echo "🗑 Archivo eliminado."; }
+modificar_tamano() { [[ -f "$FAKE_USB_DIR/file1/file1.txt" ]] && echo "Línea adicional de prueba" >> "$FAKE_USB_DIR/file1/file1.txt" && echo "📏 Tamaño modificado." || echo "⚠️ El archivo file1.txt no existe."; }
+cambiar_permisos() { [[ -f "$FAKE_USB_DIR/file3/file3.txt" ]] && chmod 777 "$FAKE_USB_DIR/file3/file3.txt" && echo "🔐 Permisos cambiados a 777." || echo "⚠️ El archivo file3.txt no existe."; }
+renombrar_archivo() { [[ -f "$FAKE_USB_DIR/file4/file4.txt" ]] && mv "$FAKE_USB_DIR/file4/file4.txt" "$FAKE_USB_DIR/file4/file4_renombrado.txt" && echo "🔁 Archivo renombrado." || echo "⚠️ El archivo file4.txt no existe."; }
 start_cpu_hog() { [[ -f "$CPU_HOG_PID_FILE" ]] && kill -0 "$(cat "$CPU_HOG_PID_FILE")" 2>/dev/null && echo "⚠️ CPU hog ya está corriendo con PID $(cat "$CPU_HOG_PID_FILE")" && return; ( while :; do :; done ) & echo $! > "$CPU_HOG_PID_FILE"; echo "✅ CPU hog iniciado con PID $(cat "$CPU_HOG_PID_FILE")"; }
 stop_cpu_hog() { [[ -f "$CPU_HOG_PID_FILE" ]] && kill -0 "$(cat "$CPU_HOG_PID_FILE")" 2>/dev/null && kill "$(cat "$CPU_HOG_PID_FILE")" && rm -f "$CPU_HOG_PID_FILE" && echo "🛑 CPU hog detenido." || echo "⚠️ No hay CPU hog activo."; }
 start_mem_hog() { [[ -f "$MEM_HOG_PID_FILE" ]] && kill -0 "$(cat "$MEM_HOG_PID_FILE")" 2>/dev/null && echo "⚠️ Memory hog ya está corriendo con PID $(cat "$MEM_HOG_PID_FILE")" && return; ( dd if=/dev/zero bs=1M count="$DEFAULT_MEM_MB" | tail -f /dev/null ) & echo $! > "$MEM_HOG_PID_FILE"; echo "✅ Memory hog iniciado con PID $(cat "$MEM_HOG_PID_FILE") (~${DEFAULT_MEM_MB} MB)"; }
@@ -53,6 +66,26 @@ abrir_servidor_http() { nohup python3 -m http.server 4444 > /dev/null 2>&1 & ech
 cerrar_servidor_http() { pkill -f 'python3 -m http.server 4444' && echo "🛑 Servidor HTTP cerrado."; }
 alternar_puerto_77() { pkill -f 'nc -l 77'; sleep 1; nohup nc -l 77 > /dev/null 2>&1 & sleep 1; pkill -f 'nc -l 77'; echo "🔄 Puerto 77 alternado."; }
 
+cambiar_timestamp() {
+    if [[ -f "$FAKE_USB_DIR/file5/file5.txt" ]]; then
+        touch -d "2020-01-01 12:00:00" "$FAKE_USB_DIR/file5/file5.txt"
+        echo "🕒 Timestamp cambiado manualmente (2020-01-01 12:00:00)."
+    else
+        echo "⚠️ El archivo file5.txt no existe."
+    fi
+}
+
+cambiar_owner() {
+    if [[ -f "$FAKE_USB_DIR/file6/file6.txt" ]]; then
+        echo "⚠️ Cambiar ownership requiere permisos sudo (ejecutando como root)..."
+        sudo chown nobody:nogroup "$FAKE_USB_DIR/file6/file6.txt" && \
+        echo "👤 Ownership cambiado a nobody:nogroup." || \
+        echo "❌ Error al cambiar ownership (¿tienes permisos?)."
+    else
+        echo "⚠️ El archivo file6.txt no existe."
+    fi
+}
+
 cleanup_and_exit() {
     echo ""
     echo "🧹 Deteniendo procesos antes de salir..."
@@ -64,7 +97,7 @@ cleanup_and_exit() {
 
 trap cleanup_and_exit SIGINT SIGTERM
 
-# Menú interactivo si no se pasa argumento
+# Menú interactivo
 while true; do
     show_menu
     read -rp "Selecciona una opción (0 para salir): " opc
@@ -89,6 +122,8 @@ while true; do
         18) abrir_servidor_http ;;
         19) cerrar_servidor_http ;;
         20) alternar_puerto_77 ;;
+        21) cambiar_timestamp ;;
+        22) cambiar_owner ;;
         0) cleanup_and_exit ;;
         *) echo "❌ Opción inválida. Intenta de nuevo." ;;
     esac

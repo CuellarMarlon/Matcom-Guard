@@ -11,12 +11,15 @@
 #include <unistd.h>
 #include <errno.h>
 
-// Lista enlazada para almacenar hashes
+// Lista enlazada para almacenar hashes y metadatos
 typedef struct file_hash {
     char *path;
     unsigned char hash[SHA256_DIGEST_LENGTH];
     mode_t mode;
     off_t size;
+    uid_t uid;
+    gid_t gid;
+    time_t mtime;
     struct file_hash *next;
 } file_hash_t;
 
@@ -30,7 +33,6 @@ struct usb_monitor {
 
 static int compute_sha256(const char *path, unsigned char out_hash[SHA256_DIGEST_LENGTH]);
 static int process_file(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf);
-static void print_hash(const unsigned char *hash);
 static file_hash_t* find_hash(file_hash_t *list, const char *path);
 static void free_hash_list(file_hash_t *list);
 
@@ -48,7 +50,6 @@ usb_monitor_t* usb_monitor_create(const usb_config_t *cfg) {
 
 void usb_monitor_set_callback(usb_monitor_t *mon, usb_alert_cb on_alert, void *user_data) {
     printf("🧪 usb_monitor_set_callback configurado\n");
-
     mon->callback = on_alert;
     mon->cb_data = user_data;
 }
@@ -77,13 +78,6 @@ static int compute_sha256(const char *path, unsigned char out_hash[SHA256_DIGEST
     return 0;
 }
 
-static void print_hash(const unsigned char *hash) {
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        printf("%02x", hash[i]);
-    }
-    printf("\n");
-}
-
 static int process_file(const char *fpath, const struct stat *sb, int typeflag, struct FTW *ftwbuf) {
     (void)ftwbuf;
     if (typeflag != FTW_F) return 0;
@@ -99,11 +93,12 @@ static int process_file(const char *fpath, const struct stat *sb, int typeflag, 
     memcpy(node->hash, hash, SHA256_DIGEST_LENGTH);
     node->mode = sb->st_mode;
     node->size = sb->st_size;
+    node->uid = sb->st_uid;
+    node->gid = sb->st_gid;
+    node->mtime = sb->st_mtime;
     node->next = current_scan;
     current_scan = node;
 
-    // printf("Hash de %s: ", fpath);
-    // print_hash(hash);
     return 0;
 }
 
@@ -122,7 +117,8 @@ static void free_hash_list(file_hash_t *list) {
         list = next;
     }
 }
-
+size_t changed = 0;
+size_t changedaux=0;
 void usb_monitor_scan(usb_monitor_t *mon) {
     if (!mon) return;
 
@@ -148,14 +144,14 @@ void usb_monitor_scan(usb_monitor_t *mon) {
         mon->baseline = current;
         mon->baseline_ready = 1;
         snprintf(result, sizeof(result), "✅ Baseline generado.\n");
+        changed=0;
         if (mon->callback) {
             mon->callback(result, mon->cb_data);
         }
         return;
     }
-    printf("🧪 Umbral leído desde config: %.5f\n", mon->cfg.change_threshold);
 
-    size_t changed = 0, total = 0;
+    size_t total = 0;
     file_hash_t *f;
 
     for (f = current; f; f = f->next) {
@@ -175,9 +171,21 @@ void usb_monitor_scan(usb_monitor_t *mon) {
                              "✏️  Contenido del archivo modificado: %s\n", f->path);
                 }
                 changed++;
-            } else if (old->mode != f->mode) {
+            }
+            if (old->mode != f->mode) {
                 snprintf(result + strlen(result), sizeof(result) - strlen(result),
                          "🔐 Permisos cambiados: %s\n", f->path);
+                changed++;
+            }
+            if (old->uid != f->uid || old->gid != f->gid) {
+                snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                         "👤 Propietario cambiado: %s (UID: %d → %d, GID: %d → %d)\n",
+                         f->path, old->uid, f->uid, old->gid, f->gid);
+                changed++;
+            }
+            if (old->mtime != f->mtime) {
+                snprintf(result + strlen(result), sizeof(result) - strlen(result),
+                         "🕒 Timestamp modificado: %s\n", f->path);
                 changed++;
             }
         }
@@ -197,12 +205,13 @@ void usb_monitor_scan(usb_monitor_t *mon) {
         snprintf(result + strlen(result), sizeof(result) - strlen(result),
                  "⚠️  ALERTA: %.2f%% de archivos cambiaron (umbral %.2f%%)\n",
                  ratio * 100, mon->cfg.change_threshold * 100);
-    } else if (changed > 0) {
+                 changed=0;
+    } else if (changed > 0&&changed!=changedaux) {
         snprintf(result + strlen(result), sizeof(result) - strlen(result),
                  "📊 Cambios detectados: %zu/%zu archivos (%.2f%%)\n",
                  changed, total, ratio * 100);
+                 changedaux=changed;
     }
-    
 
     if (mon->callback) {
         mon->callback(result, mon->cb_data);
