@@ -12,24 +12,24 @@
 
 volatile int ejecutando = 1; // <--- ÚNICA definición real
 
-static pid_t pid_usb = -1, pid_proc1 = -1, pid_proc2 = -1;
+// static pid_t pid_usb = -1, pid_proc1 = -1, pid_proc2 = -1;
 
 // Nueva función: solo detiene los procesos hijos, no termina la app
 void detener_controlador_desde_gui() {
     ejecutando = 0;
 
-    if (pid_usb > 0) {
-        kill(pid_usb, SIGTERM);
-        pid_usb = -1;
-    }
-    if (pid_proc1 > 0) {
-        kill(pid_proc1, SIGTERM);
-        pid_proc1 = -1;
-    }
-    if (pid_proc2 > 0) {
-        kill(pid_proc2, SIGTERM);
-        pid_proc2 = -1;
-    }
+    // if (pid_usb > 0) {
+    //     kill(pid_usb, SIGTERM);
+    //     pid_usb = -1;
+    // }
+    // if (pid_proc1 > 0) {
+    //     kill(pid_proc1, SIGTERM);
+    //     pid_proc1 = -1;
+    // }
+    // if (pid_proc2 > 0) {
+    //     kill(pid_proc2, SIGTERM);
+    //     pid_proc2 = -1;
+    // }
 }
 
 // Manejador de señales: sigue cerrando todo (incluye exit)
@@ -38,9 +38,9 @@ void manejador_terminacion(int sig) {
     printf("\n🚨 Señal recibida. Finalizando...\n");
     ejecutando = 0;
 
-    if (pid_usb > 0) kill(pid_usb, SIGTERM);
-    if (pid_proc1 > 0) kill(pid_proc1, SIGTERM);
-    if (pid_proc2 > 0) kill(pid_proc2, SIGTERM);
+    // if (pid_usb > 0) kill(pid_usb, SIGTERM);
+    // if (pid_proc1 > 0) kill(pid_proc1, SIGTERM);
+    // if (pid_proc2 > 0) kill(pid_proc2, SIGTERM);
 
     sleep(1);
     exit(0);
